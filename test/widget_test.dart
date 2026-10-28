@@ -3,9 +3,97 @@ import 'package:bottom_nav_demo/widgets/bottom_nav.dart';
 import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('cancel and secondary pointers never commit a different page', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const NavigationDemo());
+    final rect = tester.getRect(
+      find.byKey(const ValueKey('bottom-nav-floating-dock')),
+    );
+    Offset tab(int i) =>
+        Offset(rect.left + 4 + (rect.width - 8) * (i + .5) / 5, rect.center.dy);
+    final first = await tester.startGesture(tab(0), pointer: 1);
+    await tester.pump(const Duration(milliseconds: 150));
+    final second = await tester.startGesture(tab(4), pointer: 2);
+    await second.up();
+    await first.moveTo(tab(3));
+    await tester.pump(const Duration(milliseconds: 80));
+    await first.cancel();
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('current-page-title')))
+          .data,
+      '首页',
+    );
+    expect(
+      tester
+          .getRect(find.byKey(const ValueKey('bottom-nav-selection')))
+          .center
+          .dx,
+      closeTo(tab(0).dx, 1),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('reduced motion retains navigation without lens expansion', (
+    tester,
+  ) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    await tester.pumpWidget(const NavigationDemo());
+    final selection = find.byKey(const ValueKey('bottom-nav-selection'));
+    final size = tester.getSize(selection);
+    final gesture = await tester.startGesture(tester.getCenter(selection));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(tester.getSize(selection), size);
+    final target = tester.getCenter(
+      find.byKey(const ValueKey('bottom-nav-semantic-4')),
+    );
+    await gesture.moveTo(target);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('current-page-title')))
+          .data,
+      '我',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('focused navigation supports keyboard end and home', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const NavigationDemo());
+    final nav = find.byKey(const ValueKey('bottom-nav-floating-dock'));
+    Focus.of(tester.element(nav)).requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.end);
+    await tester.pump();
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('current-page-title')))
+          .data,
+      '我',
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.home);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('current-page-title')))
+          .data,
+      '首页',
+    );
+  });
+
   testWidgets('liquid tabs respond to tap, drag, and rapid retargeting', (
     tester,
   ) async {
@@ -119,6 +207,9 @@ void main() {
     final selection = tester.getRect(
       find.byKey(const ValueKey('bottom-nav-selection')),
     );
-    expect(selection.center.dx, closeTo(dock.left + dock.width * .9, 2));
+    expect(
+      selection.center.dx,
+      closeTo(dock.left + 4 + (dock.width - 8) * .9, 1),
+    );
   });
 }

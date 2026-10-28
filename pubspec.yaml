@@ -1,5 +1,5 @@
 name: bottom_nav_demo
-description: SYLUlive bottom navigation demo.
+description: Live refractive liquid glass navigation in Flutter.
 publish_to: 'none'
 version: 1.0.0+1
 environment:
@@ -10,12 +10,13 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
   flutter_lints: ^6.0.0
 flutter:
   uses-material-design: true
   shaders:
-    - shaders/liquid_nav_lens.frag
-    - shaders/liquid_nav_dock.frag
+    - shaders/liquid_glass.frag
   fonts:
     - family: NotoSansCJKsc
       fonts:

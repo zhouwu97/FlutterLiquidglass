@@ -15,12 +15,18 @@ class BottomNav extends StatelessWidget {
     required this.onTap,
     this.style = BottomNavStyle.floating,
     this.badges = const {},
+    this.compareGlass = false,
+    this.glassBlur = 6,
+    this.glassTint,
   }) : assert(currentIndex >= 0 && currentIndex < 5);
 
   final int currentIndex;
   final ValueChanged<int> onTap;
   final BottomNavStyle style;
   final Map<int, bool> badges;
+  final bool compareGlass;
+  final double glassBlur;
+  final double? glassTint;
 
   static const labels = ['首页', '集市', '课表', '校园', '我'];
   static const icons = [
@@ -38,6 +44,9 @@ class BottomNav extends StatelessWidget {
         currentIndex: currentIndex,
         onTap: onTap,
         badges: badges,
+        compare: compareGlass,
+        blur: glassBlur,
+        tint: glassTint,
       );
     }
     final dark = Theme.of(context).brightness == Brightness.dark;
@@ -255,10 +264,16 @@ class _LiquidNavAdapter extends StatefulWidget {
     required this.currentIndex,
     required this.onTap,
     required this.badges,
+    required this.compare,
+    required this.blur,
+    this.tint,
   });
   final int currentIndex;
   final ValueChanged<int> onTap;
   final Map<int, bool> badges;
+  final bool compare;
+  final double blur;
+  final double? tint;
 
   @override
   State<_LiquidNavAdapter> createState() => _LiquidNavAdapterState();
@@ -300,5 +315,8 @@ class _LiquidNavAdapterState extends State<_LiquidNavAdapter> {
     onTap: _select,
     onNavigationCommitted: _select,
     badges: widget.badges,
+    compare: widget.compare,
+    blur: widget.blur,
+    tint: widget.tint,
   );
 }
