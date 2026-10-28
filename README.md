@@ -2,6 +2,35 @@
 
 五入口导航，使用真实背景纹理与图标纹理进行 GPU 合成。主界面保留液态、悬浮、普通三种样式，新增网格、清透材质和「仅模糊对照」，便于验证折射，而不是仅观察透明度。
 
+## 在线体验与效果截图
+
+**[打开液态玻璃交互演示](https://flutter-liquid-glass-demo.goldenridge10.chatgpt.site)**
+
+手机可直接触摸底栏，电脑使用鼠标按住选中胶囊拖动。试试慢拖、快速换向和松手回弹；开启「网格背景」与「清透材质」，更容易看清网格、文字和图标经过玻璃时的折射。也可以切换深色模式，或开启「仅模糊对照」比较差异。
+
+以下为当前 Flutter Web 版本的真实运行截图（430 × 932 视口），按压与拖动状态均在指针保持按下时采集。
+
+<table>
+  <tr>
+    <th>浅色 · 默认材质</th>
+    <th>按住 · 胶囊膨胀与折射</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/demo-light.jpg" width="320" alt="浅色界面与默认液态玻璃底栏"></td>
+    <td><img src="docs/images/demo-pressed.jpg" width="320" alt="按住首页胶囊，透镜膨胀并折射后方内容"></td>
+  </tr>
+  <tr>
+    <th>拖动 · 透镜跨入口移动</th>
+    <th>深色 · 网格与清透材质</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/demo-drag.jpg" width="320" alt="保持按压拖向校园入口时的玻璃透镜"></td>
+    <td><img src="docs/images/demo-dark.jpg" width="320" alt="深色主题下的清透玻璃和网格背景"></td>
+  </tr>
+</table>
+
+截图展示材质与按压体积；连续形变和惯性回弹请在在线演示中操作查看。网页使用本地打包的 CanvasKit 资源，首次打开需要下载 Flutter 运行资源和中文字体。
+
 ## 对照来源
 
 - [LocationSpoofer / AndroidFloatingBottomBar.kt](https://github.com/TaoCultivator/LocationSpoofer/blob/44e1ce221e47499b973fb1a1400fe8e45c9403a8/app-ui/src/main/java/com/vincenthzr/locationspoofer/ui/liquid/AndroidFloatingBottomBar.kt)：导航结构、尺寸、合成次序、按压与回弹。

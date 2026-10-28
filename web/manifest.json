@@ -1,11 +1,11 @@
 {
-    "name": "bottom_nav_demo",
-    "short_name": "bottom_nav_demo",
+    "name": "Flutter 液态玻璃交互演示",
+    "short_name": "液态玻璃",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#e0edf2",
+    "theme_color": "#e0edf2",
+    "description": "按住底栏，体验实时折射、弹性形变与惯性回弹。",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
