@@ -4,7 +4,9 @@
 
 ## 在线体验与效果截图
 
-**[打开液态玻璃交互演示](https://flutter-liquid-glass-demo.goldenridge10.chatgpt.site)**
+**[打开液态玻璃交互演示](https://flutter-liquid-glass-demo.goldenridge10.site/)**
+
+新域名已绑定，正在等待 [DNS 验证与 HTTPS 证书](docs/demo-domain.md)。生效前可使用 [备用演示入口](https://flutter-liquid-glass-demo.goldenridge10.chatgpt.site/)。
 
 手机可直接触摸底栏，电脑使用鼠标按住选中胶囊拖动。试试慢拖、快速换向和松手回弹；开启「网格背景」与「清透材质」，更容易看清网格、文字和图标经过玻璃时的折射。也可以切换深色模式，或开启「仅模糊对照」比较差异。
 
