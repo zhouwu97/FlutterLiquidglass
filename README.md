@@ -1,14 +1,14 @@
 # 液态玻璃：Flutter 与 WinUI
 
-提供 Flutter 移动导航透镜和 Windows 固定组件两条可运行路径，以及面向不同组件、不同宿主的 [liquid glass skill](skills/flutter-liquid-glass/SKILL.md)。材质与交互分开适配：导航可以移动，卡片只在抓取点附近拉扯形变。
+提供 Flutter 移动导航透镜和 Windows 弹性组件两条可运行路径，以及面向不同组件、不同宿主的 [liquid glass skill](skills/flutter-liquid-glass/SKILL.md)。材质与交互分开适配：移动透镜、整块小幅跟手并回原位的卡片、按住时玻璃化的滑动开关。
 
 ## Windows 原生组件与截图
 
 [WinUI 示例源码与运行方法](examples/winui-liquid-glass/) · [移植复盘](docs/winui-retrospective.md)
 
-![WinUI 液态玻璃实验：移动透镜与固定卡片](docs/images/winui-rest.png)
+![WinUI 液态玻璃实验：移动透镜与弹性卡片](docs/images/winui-rest.png)
 
-右侧卡片使用局部形变场，主体、远处边缘和文字固定；松手弹回，内部按钮和输入框保留原生行为。左侧用于比较移动透镜的折射。截图来自真实运行的客户端区域；更多拉扯状态见示例说明。
+右侧卡片与文字小幅跟手，快速拖动产生拉伸和曲面弯曲；松手弹回原位。内部按钮、输入框和拖动开关保留各自的操作。玻璃边缘清晰折射，四边有方向高光，不叠加黑色按压内圈。左侧用于比较移动透镜的折射。截图来自真实运行的客户端区域；更多拉扯状态见示例说明。
 
 ```powershell
 cd examples/winui-liquid-glass

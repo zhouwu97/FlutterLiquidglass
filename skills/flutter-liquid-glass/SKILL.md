@@ -18,7 +18,7 @@ Choose these independently from the request and existing host:
 | Geometry | Capsule, rounded rectangle, asymmetric corners, custom SDF/path |
 | Transmission | Clear detail, intentional frost, subtle colored absorption |
 | Foreground | Crisp text above glass, or content intentionally refracted inside it |
-| Interaction | Fixed local pull, moving lens, semantic selection, button press, passive panel |
+| Interaction | Fixed local pull, tethered component that returns home, moving lens, semantic selection, button press, passive panel |
 | Scene | Live application content, explicit decorative scene, or platform backdrop |
 
 When an optical or interaction assumption is uncertain, validate a small isolated demo using the actual host renderer before integrating. Respect a requested demo → test → host → publish sequence. Reusing the shader alone does not validate the host's layering or event routing.
@@ -28,6 +28,7 @@ When an optical or interaction assumption is uncertain, validate a small isolate
 Read [interaction-models.md](references/interaction-models.md) for the selected mode.
 
 - **Fixed card/button pulled in place:** localize deformation near the grabbed edge. Leave the body, distant corners, opposite edge and foreground fixed. A fixed center plus whole-card scale/skew can still look like sliding; center-only tests are insufficient.
+- **Tethered component:** move foreground and surface together, return position targets to the resting location on release, and preserve spring velocity. Tune pointer gain/travel independently of damping and curvature; do not turn a prior fixed-position preference into a universal rule.
 - **Draggable lens:** position follows input with continuous spring state; velocity and lag may drive stretch and bend.
 - **Selection indicator:** keep visual motion ownership separate from selected business state. Preserve the host's commit phase, keyboard navigation and cancellation behavior.
 - **Button/passive panel:** keep native activation and hit testing. Do not attach navigation or drag-to-select semantics just because the example has them.
@@ -64,6 +65,6 @@ Keep screenshots and traces from the current build and record their capture meth
 
 - [reference-model.md](references/reference-model.md): equations and uniform layout for the original Flutter navigation lens; its coefficients and selected-item behavior are example-specific.
 - `assets/reference_flutter/`: optional runnable Flutter source bundle. Create a separate Flutter project and overlay this bundle to explore it; do not overwrite a business project wholesale.
-- [WinUI example](https://github.com/zhouwu97/FlutterLiquidglass/tree/main/examples/winui-liquid-glass): independent Direct2D demo, local-pull and moving-lens models, GPU probes and native input capture script. Read its build requirements before copying.
+- [WinUI example](https://github.com/zhouwu97/FlutterLiquidglass/tree/main/examples/winui-liquid-glass): independent Direct2D demo, tethered component and moving-lens models, GPU probes and native input capture script. Read its build requirements before copying.
 
 Adapt these pieces to the requested shape and interaction. Publishing remains within the user's requested destination and scope; installing this skill does not authorize external actions.

@@ -50,6 +50,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         BuildUI();
+        LiquidGlass.Services.ButtonMotion.Attach(Root);
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1440, 820));
         _timer.Tick += OnTick;
         Closed += (_, _) =>
@@ -81,7 +82,7 @@ public sealed partial class MainWindow : Window
             Root.RowDefinitions.Add(new RowDefinition { Height = height });
         var header = new StackPanel { Spacing = 5 };
         header.Children.Add(new TextBlock { Text = "液态玻璃 · 独立实验", FontSize = 27 });
-        header.Children.Add(new TextBlock { Text = "左侧透镜演示移动折射；右侧应用卡片可以原地拉扯、松手回弹，内部按钮和输入框保持正常。", TextWrapping = TextWrapping.Wrap, Opacity = .7 });
+        header.Children.Add(new TextBlock { Text = "左侧透镜演示移动折射；右侧应用卡片跟随拖动、拉伸，松手弹回。内部按钮和输入框保持正常。", TextWrapping = TextWrapping.Wrap, Opacity = .7 });
         Root.Children.Add(header);
         var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16 };
         var replay = new Button { Content = "自动演示" };
@@ -144,18 +145,22 @@ public sealed partial class MainWindow : Window
             Width = 260, VerticalAlignment = VerticalAlignment.Bottom, HorizontalAlignment = HorizontalAlignment.Right,
         };
         backdrop.Children.Add(artwork);
+        var marks = new TextBlock { Text = "0123456789  ABCDEFG", FontSize = 19,
+            Foreground = new SolidColorBrush(Rgb(231, 240, 255)) };
+        Microsoft.UI.Xaml.Controls.Canvas.SetLeft(marks, 16);
+        grid.Children.Add(marks);
         host.Children.Add(backdrop);
         _nativeScene = new LiquidGlassScene(backdrop);
         artwork.ImageOpened += (_, _) => _nativeScene?.Invalidate();
         LiquidGlassScope.SetScene(host, _nativeScene);
-        host.Children.Add(new TextBlock { Text = "固定位置 · 真实应用组件", FontSize = 19, Margin = new Thickness(22),
+        host.Children.Add(new TextBlock { Text = "弹性跟手 · 真实应用组件", FontSize = 19, Margin = new Thickness(22),
             VerticalAlignment = VerticalAlignment.Top, Foreground = new SolidColorBrush(Rgb(255, 255, 255)) });
         var content = new StackPanel { Spacing = 14 };
-        var heading = new TextBlock { Text = "按住空白处拉扯", FontSize = 20, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+        var heading = new TextBlock { Text = "按住拖动 · 松手弹回", FontSize = 20, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Rgb(255, 255, 255)) };
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(heading, "AnchoredHeading");
         content.Children.Add(heading);
-        content.Children.Add(new TextBlock { Text = "只有抓取点附近的边缘形变。\n主体、远侧边缘和文字位置不变。", TextWrapping = TextWrapping.Wrap,
+        content.Children.Add(new TextBlock { Text = "整块玻璃与文字一起跟手。\n快速拖动时拉伸、弯曲，松手回到原位。", TextWrapping = TextWrapping.Wrap,
             Foreground = new SolidColorBrush(Rgb(239, 239, 248)) });
         var test = new Button { Content = "测试按钮 · 0", HorizontalAlignment = HorizontalAlignment.Stretch,
             Style = (Style)Application.Current.Resources["SecondaryButtonStyle"] };
@@ -166,10 +171,20 @@ public sealed partial class MainWindow : Window
         var entry = new TextBox { PlaceholderText = "输入与选择文字保持正常" };
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(entry, "AnchoredEntry");
         content.Children.Add(entry);
+        var toggleRow=new Grid();
+        toggleRow.Children.Add(new TextBlock { Text="拖动开关", VerticalAlignment=VerticalAlignment.Center,
+            Foreground=new SolidColorBrush(Rgb(255,255,255)) });
+        var toggle=new LiquidGlassToggleSwitch { HorizontalAlignment=HorizontalAlignment.Right,
+            Style=(Style)Application.Current.Resources["LiquidGlassToggleStyle"] };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(toggle,"GlassToggle");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(toggle,"拖动开关");
+        toggleRow.Children.Add(toggle); content.Children.Add(toggleRow);
         var panel = new GlassPanel { Content = content, Margin = new Thickness(24, 0, 24, 0), Padding = new Thickness(20),
             VerticalAlignment = VerticalAlignment.Center };
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(panel, "AnchoredPanel");
         host.Children.Add(panel);
+        panel.SizeChanged += (_, _) => Microsoft.UI.Xaml.Controls.Canvas.SetTop(marks, (host.ActualHeight-panel.ActualHeight)/2+4);
+        host.SizeChanged += (_, _) => Microsoft.UI.Xaml.Controls.Canvas.SetTop(marks, (host.ActualHeight-panel.ActualHeight)/2+4);
         return host;
     }
 

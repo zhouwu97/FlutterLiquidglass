@@ -2,11 +2,11 @@
 
 可独立构建的 WinUI 3 / Win2D / Direct2D 示例，从真实桌面应用中提取光学与交互层。运行无需应用账号、数据库或网络服务。
 
-左侧为可移动透镜；右侧为固定卡片和原生按钮。**固定卡片只在抓取点附近产生局部拉扯，远处边缘、主体与文字留在原位。** 松手弹回，按钮仍可点击，输入框仍可编辑。移动透镜与固定组件使用不同的运动模型。
+左侧为可移动透镜；右侧为采用 design-systems 弹簧模型的原生卡片与按钮。整块组件和文字短暂跟手，速度驱动拉伸，滞后驱动曲面弯曲，松手返回原位。宿主采用较克制的参数：指针位移乘 0.18，卡片最多 12 DIP、按钮最多 4 DIP。背景清晰透射，圆角、法线、折射和高光来自同一曲面。
 
 ![WinUI 液态玻璃实验](../../docs/images/winui-rest.png)
 
-| 局部向外拉扯 | 反向拉扯 |
+| 跟手与边缘折射 | 反向与回弹 |
 | --- | --- |
 | ![抓取点附近的边缘鼓起](../../docs/images/winui-pull.png) | ![反向受力的局部形变](../../docs/images/winui-reverse.png) |
 
@@ -27,7 +27,7 @@ dotnet run --project .\tools\GlassProbe\GlassProbe.csproj -c Release -- build\pr
 
 程序位于 `build/app/LiquidGlassDemo.exe`，应保留整个发布目录的依赖。脚本通过桌面 shell 启动，避免打包调用方干扰 `ms-appx` 资源身份；复制文件后直接打开 EXE 也可运行。无需提升权限。
 
-`-Capture` 预热资源后输出移动透镜七个阶段、固定卡片与按钮各六个阶段，以及两份状态记录。这是模型驱动的 GPU 捕获，不冒充鼠标测试。
+`-Capture` 预热资源后输出移动透镜七个阶段、弹性卡片与按钮各六个阶段，以及两份状态记录。这是模型驱动的 GPU 捕获，不冒充鼠标测试。
 
 真实鼠标检查需解锁且无人操作的桌面，并保持 Demo 在前台：
 
@@ -36,13 +36,13 @@ python -m pip install pywinauto pillow
 python .\scripts\capture-pointer.py <Demo进程ID> build\pointer-check
 ```
 
-它检查实际按住/释放、前台窗口、轨迹位置、正文坐标、一次按钮点击和输入框编辑。被其他输入打断会失败，不能把这次图片当作目标阶段证据。`PrintWindow` 在本环境返回过旧回退层，因此脚本捕获实际可见的客户端区域。
+它检查实际按住/释放、前台窗口、轨迹位置、正文随动/回原位、拖动按钮不误触、点击一次、键盘激活及输入/选择。被其他输入打断会失败，不能把这次图片当作目标阶段证据。`PrintWindow` 在本环境返回过旧回退层，因此脚本捕获实际可见的客户端区域。
 
 ## 接入自己的组件
 
 - `src/Demo/Controls/`：距离字段 shader、共享场景、渲染器、表面及原生输入观察器。
-- `src/Demo/Core/`：移动透镜和局部拉扯两个模型、光学坐标与尺寸工具。
-- `src/Demo/Themes/`：原生面板/按钮模板；正文独立于光学形变，静态回退边框在 GPU 就绪后隐藏。
+- `src/Demo/Core/`：移动透镜和锚定回弹两个模型、光学坐标与尺寸工具。
+- `src/Demo/Themes/`：原生面板/按钮模板；正文与整个组件共享 affine pose，shader 只额外处理曲面滞后弯曲；GPU 就绪后隐藏静态回退边框。
 - `src/Demo/DemoServices.cs`：示例的诊断接收器。集成时替换为宿主日志，不需接入原应用服务。
 
 用 `LiquidGlassScope.SetScene` 注册独立背景图层，或给 `GlassPanel.BackdropSource` 指定单独的装饰元素。不要将包含玻璃自身的祖先作为捕获源。可将组件所需文件提取到宿主项目；先处理宿主资源、命名空间与回调，避免整套替换业务主题。
@@ -51,6 +51,16 @@ python .\scripts\capture-pointer.py <Demo进程ID> build\pointer-check
 
 ## 验证与许可
 
-37 项模型/坐标单测与 14 项 Direct2D GPU 检查。局部形变额外核对对侧边缘、远处角点和主体纹理，并验证释放后至少 4 DIP 的反向回弹。原生鼠标测试还要求屏幕上的边缘确实向布局外鼓起，防止绘制层被圆角容器裁掉。详见[迁移复盘](../../docs/winui-retrospective.md)。不同硬件帧率、跨显示器 DPI 热切换与其他后端仍需目标环境检查。
+39 项模型/坐标单测与 21 项 Direct2D GPU 检查。运动轨迹来自 design-systems `7a424c93b9be13cf835b91ea67495fec2ec0584e` 的实际 `JellyController.tick`，逐帧比较跟手、反向、释放和再次抓取；另测宿主的小幅度参数、边界、不同帧率与原点。GPU 检查包括外部 affine 变换不会重复应用、法线映射与滞后弯曲。原生捕获额外检查实际 shader uniform 的逆矩阵有效，防止独立探针通过、宿主却丢失折射。详见[迁移复盘](../../docs/winui-retrospective.md)。
+
+更新参考轨迹（先检出上述精确版本）：
+
+```powershell
+node scripts/generate-reference-motion.mjs <design-systems仓库目录>
+```
+
+参考方程保持原值；宿主只调整位移增益和上限。清晰玻璃默认 blur 0.25 DIP，大卡片的曲面带按短边比例扩展至最多 40 DIP，玻璃面板圆角 28 DIP。跨显示器 DPI 热切换与其他后端仍需目标环境验证。
 
 光学来源与 ComputeSharp 许可保留在 `src/Demo/Assets/GlassNotices/`。人物是原桌面主题的 AI 同人插画，角色权利属于原权利方，与软件许可分开说明；更换插画不影响组件。原有 Flutter 实现及许可证保持独立。
+
+开关示例：按住时透明玻璃滑块，左右拖动连续变色，松手后才提交开关状态并还原普通滑块。`scripts/capture-toggle.py PID 输出目录` 检查反向预览、取消、点击、键盘与 UIA TogglePattern。

@@ -20,6 +20,16 @@ The example uses bounded vector springs and a 28-DIP paint margin; these values 
 
 Tune press response and recoil separately from movement. A fixed local surface still needs an understandable initial press and visible settling; in the WinUI example a small outward press bulge and underdamped pull springs produce that response without moving the body. Check sign reversal/overshoot in the released field, and verify it survives host clipping. Merely lowering damping cannot repair a clipped optical layer.
 
+## Tethered component that returns to rest
+
+Use when the requested reference includes temporary travel of the whole component. Move surface and crisp foreground with one centered affine pose. Position/press springs drive velocity strain and lag bend; on release target position and pressure back to zero without discarding velocity. A held pointer that stops moving should stop strain/bend while retaining a slight pressed lift.
+
+Pointer gain and travel limit are host choices. The studied design-systems controller uses panel/button limits 75/18; the WinUI host was tuned to 12/4 DIP with gain 0.18 after user feedback. These are examples, not universal requirements. Compare against a pinned reference trajectory before changing the solver to compensate for a scale preference.
+
+If the host already applies the affine stretch, the shader must not repeat it in the SDF. Use inverse-transpose for world normals and the inverse affine linear part to map world optical displacement back to local texture coordinates. Keep scene sampling anchored in source coordinates so the background does not travel with the component. Bend still deforms the local SDF. Preserve original transforms and account for the host's transform origin.
+
+Use root/scene pointer coordinates for travel, not coordinates inside the already moving element. Ignore capture-loss bubbling from a former/child owner. A true drag should suppress native release activation while taps and keyboard commands remain native; test the actual host because transferring capture alone did not cancel a WinUI Button click reliably. Restore any temporary native state after the current routed release event, and on cancellation/unload.
+
 ## Moving lens or draggable object
 
 Position is part of the intended interaction. Maintain position, pressure/activation, stretch and bend as continuous state. Derive directional strain from velocity and bending from lag/force. Use an inverse stretch matrix in the SDF and optional reciprocal cross-axis compensation. Do not apply this full-object transform to a fixed local-pull card.
@@ -33,3 +43,9 @@ Keep host state and visual state separate. A navigation spring may continue afte
 For native buttons, observe handled input without stealing native capture or replacing Click/Command. A parent surface must recognize a child interactive owner and abstain. Exclude editing controls, scrollbars and selection handles as appropriate. Watch release/cancel/capture-lost outside the original bounds; unload and reduced-motion transitions must clear tracking and restore the rest state.
 
 One optical layer owns each control. A separate generic button-scale animation combined with shader deformation can move the foreground and double the response. Use static color/opacity feedback for reduced motion and solid fallbacks.
+
+## Glass only while a switch is held
+
+A switch may use a temporary glass thumb while resting thumbs remain ordinary solid controls. Keep preview position and the saved boolean separate: track color follows continuous thumb progress, release commits once at the midpoint, cancellation restores the prior boolean, and a tap toggles once. Pressure/shape springs fade glass back to the ordinary thumb on release. Clamp the enlarged thumb inside its rail, including scale compensation at each end. Warm optical resources before hiding the solid thumb, and retain it until successful shader draw.
+
+Preserve the host toggle's accessibility pattern, name, state announcements, keyboard focus/space/arrows and disabled behavior. WinUI ToggleSwitch is sealed; use an adapter/template when possible or a Control with explicit TogglePattern peer and IsOn/Toggled semantics. Parent card gestures must exclude it. A prototype that changes model state is insufficient: verify actual pointer drag in both directions, intermediate track color, no premature settings write, cancel, keyboard and automation.

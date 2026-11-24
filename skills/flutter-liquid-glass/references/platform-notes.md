@@ -12,6 +12,9 @@ Read only the platform section relevant to the host. Flutter/WinUI notes below c
 
 ## WinUI 3 / Win2D / Direct2D
 
+- ComputeSharp vector operators are shader intrinsics; do not use them for CPU uniform arithmetic. In the native renderer, dividing a `Float4` by lift produced a zero inverse matrix, removing normals, refraction and rim lighting while a standalone shader probe still passed. Compute scalars/System.Numerics first, construct the uniform last, and inspect actual native constants/output as well as probe output.
+- On dark glass, a pointer glint, press shadow, tint and blur can combine into a visible oval wash. Identify each layer with matched clear/control renders; keep surface-edge lighting separate from interior lighting so a requested clear lens can disable the latter. A model that is transparent over a pale scene may still look foggy over a dark navigation background.
+
 - Build the effect graph in one pixel coordinate space. In this port, complex shader samplers failed with `D2DERR_INVALID_GRAPH_CONFIGURATION` when implicit DPI compensation entered the graph. Rendering to a 96-DPI target sized in physical pixels, then presenting once in XAML DIP, avoided that failure. Validate scaling and transforms rather than hardcoding DPI to hide it.
 - `RenderTargetBitmap` can contain overflowing descendants. Save its actual dimensions and XamlRoot rasterization scale. A GPU-downsampled source still needs the original pixel-to-DIP mapping.
 - Composition backdrop blur is a useful fallback; it is not displaced scene sampling. Report shader readiness only after successful scene capture and drawing. Dispose CanvasControl resources with the visual tree.

@@ -11,8 +11,10 @@ Use a grid, readable text and asymmetric corner marks, plus realistic content. C
 | Intended behavior | Observable check |
 | --- | --- |
 | Fixed local pull | Grabbed edge bends; far corners/opposite edge and body texture stay fixed; no whole-card affine transform; text/layout coordinates unchanged |
+| Tethered component | Whole surface and foreground travel together within configured gain/limits; release returns to original coordinates |
+| Held glass switch | Preview color follows thumb in either direction; boolean commits once on release; cancel restores, ordinary thumb returns |
 | Moving lens | Continuous input-driven position and directional deformation; slow/fast drags differ where intended |
-| Sustained pull | Shape remains deformed while held still; idle frames stop |
+| Sustained hold | Local pull retains its field; tether velocity strain settles while pressed lift remains; idle frames stop |
 | Reversal/re-grab | Preserve state/velocity; do not instantly relocate an existing local field |
 | Release/cancel | Converge to rest; clear capture/listeners; no unintended business commit |
 | Elastic recoil | Observable overshoot/reversal at the grabbed edge, with sufficient paint space; tuning a spring is insufficient if the native host clips it |
