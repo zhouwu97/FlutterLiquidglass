@@ -47,3 +47,10 @@ app.*.map.json
 # Local screenshots
 /preview.png
 /.site-demo/
+
+# Native examples
+**/bin/
+**/obj/
+examples/**/build/
+**/TestResults/
+**/.vs/

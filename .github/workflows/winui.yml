@@ -1,0 +1,30 @@
+name: WinUI example
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'examples/winui-liquid-glass/**'
+      - '.github/workflows/winui.yml'
+  pull_request:
+    paths:
+      - 'examples/winui-liquid-glass/**'
+      - '.github/workflows/winui.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: examples/winui-liquid-glass
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.400'
+      - run: dotnet test tests/LiquidGlass.Tests.csproj -c Release
+      - run: dotnet publish src/Demo/LiquidGlassDemo.csproj -c Release -p:Platform=x64 --self-contained true -m:1 -p:UseSharedCompilation=false -o build/app

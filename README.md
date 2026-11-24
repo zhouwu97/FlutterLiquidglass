@@ -1,4 +1,29 @@
-# Flutter 液态玻璃底部导航
+# 液态玻璃：Flutter 与 WinUI
+
+提供 Flutter 移动导航透镜和 Windows 固定组件两条可运行路径，以及面向不同组件、不同宿主的 [liquid glass skill](skills/flutter-liquid-glass/SKILL.md)。材质与交互分开适配：导航可以移动，卡片只在抓取点附近拉扯形变。
+
+## Windows 原生组件与截图
+
+[WinUI 示例源码与运行方法](examples/winui-liquid-glass/) · [移植复盘](docs/winui-retrospective.md)
+
+![WinUI 液态玻璃实验：移动透镜与固定卡片](docs/images/winui-rest.png)
+
+右侧卡片使用局部形变场，主体、远处边缘和文字固定；松手弹回，内部按钮和输入框保留原生行为。左侧用于比较移动透镜的折射。截图来自真实运行的客户端区域；更多拉扯状态见示例说明。
+
+```powershell
+cd examples/winui-liquid-glass
+.\scripts\run.ps1
+```
+
+独立示例不依赖原业务项目，可单独构建；.NET/WinUI 版本与验证命令见示例 README。
+
+## 让 AI 接入其他组件
+
+将 `skills/flutter-liquid-glass` 整个目录复制到 AI 工具的 skills 目录，用 `$flutter-liquid-glass` 调用。保留历史调用名，内容已覆盖 Flutter、WinUI 与其他具备纹理/着色器能力的宿主。
+
+例如：“在现有 WinUI 页面实现固定卡片的局部拉扯，文字与位置不变”；或“实现可移动的 Flutter 玻璃透镜，保留现有导航和键盘行为”。skill 会先确定采样、形状、交互与平台能力，再选实现和验收方式。它不把每个组件都做成五入口导航，也不宣称未验证的平台已具备完整效果。
+
+## Flutter 底部导航
 
 五入口导航，使用真实背景纹理与图标纹理进行 GPU 合成。主界面保留液态、悬浮、普通三种样式，新增网格、清透材质和「仅模糊对照」，便于验证折射，而不是仅观察透明度。
 

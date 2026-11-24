@@ -1,4 +1,4 @@
 interface:
-  display_name: "Flutter Liquid Glass"
-  short_description: "Velocity-driven glass optics and navigation in Flutter"
-  default_prompt: "Use $flutter-liquid-glass to implement and verify a velocity-driven Flutter liquid glass navigation bar."
+  display_name: "Liquid Glass · 跨平台材质与交互"
+  short_description: "Refractive glass and local elastic pulls across UI frameworks"
+  default_prompt: "Use $flutter-liquid-glass to implement and verify liquid glass for my component and platform, preserving its intended layout and interaction."
