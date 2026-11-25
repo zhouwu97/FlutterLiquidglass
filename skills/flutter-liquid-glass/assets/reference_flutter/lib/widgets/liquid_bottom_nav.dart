@@ -179,15 +179,13 @@ class _BottomNavWrapperState extends State<BottomNavWrapper>
     _tracker = VelocityTracker.withKind(event.kind)
       ..addPosition(event.timeStamp, event.position);
     if (!_startedOnLens) {
-      // Start pressing where the lens currently is, then spring to the finger.
-      // Preserve position and momentum, including when re-grabbing mid-flight.
-      _grabOffset = 0;
+      // A new press owns the lens immediately, but never commits navigation.
+      final target = _index(p.dx);
+      _fluid.snapTo(target.toDouble());
+      _grabOffset = p.dx - (4 + (target + .5) * _itemWidth);
+      _startedOnLens = true;
     }
     _fluid.grab(pressure: _pressure(event));
-    _fluid.dragTo(
-      (p.dx - 4 - _grabOffset) / _itemWidth - .5,
-      pressure: _pressure(event),
-    );
   }
 
   void _move(PointerMoveEvent event) {
@@ -205,11 +203,7 @@ class _BottomNavWrapperState extends State<BottomNavWrapper>
       if (!_startedOnLens) _grabOffset = 0;
     }
     if (!_dragging) {
-      // Small pointer jitter must not cancel the automatic journey.
-      _fluid.dragTo(
-        (p.dx - 4 - _grabOffset) / _itemWidth - .5,
-        pressure: _pressure(event),
-      );
+      if (_startedOnLens) _fluid.grab(pressure: _pressure(event));
       return;
     }
     final measured = _tracker!.getVelocity().pixelsPerSecond.dx;

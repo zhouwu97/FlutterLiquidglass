@@ -1,6 +1,6 @@
 ---
 name: flutter-liquid-glass
-description: Build and debug refractive liquid glass materials and elastic interactions for UI components in Flutter, WinUI, web and other shader-capable hosts. Use for glass cards, buttons, lenses, toolbars, navigation and custom shapes; adapt rendering and gestures to the actual platform.
+description: Build, port and debug refractive liquid glass cards, buttons, switches and navigation in Flutter, WinUI and other shader-capable hosts. Match the requested reference, distinguish tap from drag, and preserve the destination's native behavior.
 ---
 
 # Liquid glass materials and interaction
@@ -11,17 +11,19 @@ The invocation name is retained for compatibility. The workflow applies beyond F
 
 Inspect the host's visual tree, scene source, layout constraints, theme, input ownership and business callbacks. Identify which visible surfaces share the material and which inner controls must retain their native behavior. Read the user's reference shader, scene capture and motion code together when available, record the revision, and retain relevant licenses.
 
-Choose these independently from the request and existing host:
+Keep a short working contract: **reference component/revision → destination project/control → requested changes → current integration stage**. Treat a screenshot supplied for visual matching as a reference; identify the destination from the conversation and workspace. Identify a command button, boolean switch or navigation selection from its actual behavior, not the word "button" alone. Apply later corrections to this contract before editing; preserve choices the user has already confirmed.
+
+Determine each dimension from the user's explicit requirements and the existing host:
 
 | Decision | Examples |
 | --- | --- |
 | Geometry | Capsule, rounded rectangle, asymmetric corners, custom SDF/path |
 | Transmission | Clear detail, intentional frost, subtle colored absorption |
 | Foreground | Crisp text above glass, or content intentionally refracted inside it |
-| Interaction | Fixed local pull, tethered component that returns home, moving lens, semantic selection, button press, passive panel |
+| Interaction | Fixed local pull, tethered return, moving lens, selection, native button press, switch tap/drag, passive panel |
 | Scene | Live application content, explicit decorative scene, or platform backdrop |
 
-When an optical or interaction assumption is uncertain, validate a small isolated demo using the actual host renderer before integrating. Respect a requested demo → test → host → publish sequence. Reusing the shader alone does not validate the host's layering or event routing.
+When an optical or interaction assumption is uncertain, validate a small isolated demo using the actual host renderer before integrating. A QA-only request confines changes to that page until the user authorizes promotion. Carry an existing promotion or publishing authorization forward within its named destinations; do not add confirmation steps to already-authorized work. Reusing the shader alone does not validate the host's layering or event routing.
 
 ## Select motion before writing transforms
 
@@ -32,12 +34,15 @@ Read [interaction-models.md](references/interaction-models.md) for the selected 
 - **Draggable lens:** position follows input with continuous spring state; velocity and lag may drive stretch and bend.
 - **Selection indicator:** keep visual motion ownership separate from selected business state. Preserve the host's commit phase, keyboard navigation and cancellation behavior.
 - **Button/passive panel:** keep native activation and hit testing. Do not attach navigation or drag-to-select semantics just because the example has them.
+- **Switch:** read [switch-model.md](references/switch-model.md). Distinguish direct dragging, native state commit and cancellation from any guided tap visual required by the reference. Match the agreed gesture in the demo and destination.
 
-Update spring targets rather than restarting tweens on each pointer event. Preserve state and velocity on release, reversal and re-grab; bound frame delta and integration steps. Stop scheduling when settled, including when a sustained pull is held still. A mouse button's held value is activation, not measured force. Reduced motion must stop deformation while leaving understandable interaction feedback.
+For direct manipulation, update spring targets rather than restarting tweens on each pointer event. A guided tap may drive those targets through a timeline; keep its phase order and current pose when interrupted. Preserve spring velocity on release, reversal and re-grab; bound frame delta and integration steps. Stop scheduling when all motion and pending tap phases settle. A mouse button's held value is activation, not measured force. Reduced motion must stop deformation while leaving understandable interaction feedback.
 
 ## Build one optical surface
 
 Capture the actual scene behind the component without the component itself. Derive coverage, normals, optical thickness, scene displacement and directional lighting from the same deformed field. Separate blur from tint; reducing opacity alone cannot create refraction. Keep dispersion and highlights restrained, and preserve premultiplied alpha at the boundary.
+
+For a refraction-only or motion-only request, retain the confirmed resting appearance, colors, tint and opacity. Tune optical displacement and motion independently. Copy reference colors/geometry into the named destination when the user requests that appearance; keep unrelated controls and other projects' appearance intact. Reference dimensions and playback rates are example settings, not global defaults.
 
 Treat the whole composited control as the material: template backgrounds, fallback washes, native selected/hover fills, ancestor clips and static borders can conceal an otherwise correct shader. Hide fallback fills only after capture and shader drawing succeed. A shader image that looks transparent is not proof that the visible control is transparent.
 
@@ -55,16 +60,19 @@ Offer an honest fallback when source capture or the shader is unavailable. Disti
 
 Use [acceptance.md](references/acceptance.md) for observable checks and evidence.
 
-1. **Motion:** hold, release, reversal, re-grab, cancellation, pointer ownership and multiple refresh rates; assert the chosen interaction contract.
+1. **Motion:** short taps in both directions, hold/drag/release, reversal, re-grab, cancellation, pointer ownership and multiple refresh rates; assert the chosen phase order and commit contract.
 2. **GPU pixels:** patterned scene and asymmetric text; check displacement versus blur-only, alpha, padding, lighting and coordinate transforms. For local pull, compare untouched edges and body pixels, not only the centroid.
-3. **Visible native control:** real press/move/release, child button clicks, text input/selection, scrolling, keyboard, themes, resizing and fallbacks. Verify the captured window is current, visible and unobscured. A model-driven capture or UI Automation Invoke does not establish pointer routing.
+3. **Visible native control:** exercise the same short tap and held drag in the demo and destination, plus child clicks, editing, scrolling, keyboard, themes, resizing and fallbacks. Inspect reduced-motion settings, effective styles and optical readiness when their behavior differs. Verify the captured surface is current and unobscured. A model-driven capture or UI Automation Invoke does not establish pointer routing.
 
 Keep screenshots and traces from the current build and record their capture method. Warm resources before phase captures. Locked desktops, occluded windows, unsupported external textures and stale window capture must be reported as limits, not replaced by a simulated success. Never fabricate or generatively retouch verification screenshots.
 
 ## Optional worked examples
 
 - [reference-model.md](references/reference-model.md): equations and uniform layout for the original Flutter navigation lens; its coefficients and selected-item behavior are example-specific.
+- [switch-model.md](references/switch-model.md): the current switch example, tap/drag contract, overflow and color choices, source files and its separate shader layout.
 - `assets/reference_flutter/`: optional runnable Flutter source bundle. Create a separate Flutter project and overlay this bundle to explore it; do not overwrite a business project wholesale.
 - [WinUI example](https://github.com/zhouwu97/FlutterLiquidglass/tree/main/examples/winui-liquid-glass): independent Direct2D demo, tethered component and moving-lens models, GPU probes and native input capture script. Read its build requirements before copying.
 
 Adapt these pieces to the requested shape and interaction. Publishing remains within the user's requested destination and scope; installing this skill does not authorize external actions.
+
+When updating examples or an installed copy, use the [resource synchronization commands](references/platform-notes.md#updating-the-skill-and-examples). Check the package actually loaded, not only the repository copy.

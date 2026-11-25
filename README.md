@@ -32,6 +32,8 @@ cd examples/winui-liquid-glass
 
 将 `skills/flutter-liquid-glass` 整个目录复制到 AI 工具的 skills 目录，用 `$flutter-liquid-glass` 调用。保留历史调用名，内容已覆盖 Flutter、WinUI 与其他具备纹理/着色器能力的宿主。
 
+更新时可先用 `python skills/flutter-liquid-glass/scripts/sync_skill.py --demo-root .` 检查示例包是否与 demo 一致；加 `--write` 刷新资源。检查或同步本机安装版用 `--install-to /path/to/skills/flutter-liquid-glass`，同样默认只检查、加 `--write` 才复制。同步后再执行一次只读检查，避免仓库已更新但实际调用仍使用旧模板。完整命令见 [skill 维护说明](skills/flutter-liquid-glass/references/platform-notes.md#updating-the-skill-and-examples)。
+
 例如：“在现有 WinUI 页面实现固定卡片的局部拉扯，文字与位置不变”；或“实现可移动的 Flutter 玻璃透镜，保留现有导航和键盘行为”。skill 会先确定采样、形状、交互与平台能力，再选实现和验收方式。它不把每个组件都做成五入口导航，也不宣称未验证的平台已具备完整效果。
 
 ## Flutter 底部导航

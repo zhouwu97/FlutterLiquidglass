@@ -1,0 +1,51 @@
+name: Liquid glass skill resources
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'skills/flutter-liquid-glass/**'
+      - 'lib/**'
+      - 'shaders/**'
+      - 'test/**'
+      - 'pubspec.yaml'
+      - 'licenses/**'
+      - 'assets/fonts/**'
+      - 'android/app/src/main/kotlin/com/example/bottom_nav_demo/MainActivity.kt'
+      - '.github/workflows/skill.yml'
+  pull_request:
+    paths:
+      - 'skills/flutter-liquid-glass/**'
+      - 'lib/**'
+      - 'shaders/**'
+      - 'test/**'
+      - 'pubspec.yaml'
+      - 'licenses/**'
+      - 'assets/fonts/**'
+      - 'android/app/src/main/kotlin/com/example/bottom_nav_demo/MainActivity.kt'
+      - '.github/workflows/skill.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python skills/flutter-liquid-glass/scripts/sync_skill.py --demo-root .
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.8'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: skills/flutter-liquid-glass/assets/reference_flutter
+      - run: flutter analyze lib test
+        working-directory: skills/flutter-liquid-glass/assets/reference_flutter
+      - run: flutter test --reporter expanded
+        working-directory: skills/flutter-liquid-glass/assets/reference_flutter

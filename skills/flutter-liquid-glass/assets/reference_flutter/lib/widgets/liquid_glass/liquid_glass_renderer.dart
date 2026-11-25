@@ -183,9 +183,9 @@ class _GlassPainter extends CustomPainter {
     final oldBlurred = resources.blurred;
     resources.capture = capture.image;
     final ratio = capture.image.width / capture.rect.width;
-    // Material is selected explicitly. Press changes the lens shape and optics,
-    // but must not silently turn the ordinary frosted material into clear glass.
-    final blur = settings.blur;
+    // Pressed glass sheds its frosted veil while retaining the optical surface.
+    final activation = settings.press.clamp(0.0, 1.0);
+    final blur = settings.blur * (1.0 - .8 * activation);
     final recorder = ui.PictureRecorder();
     final blurCanvas = Canvas(recorder);
     blurCanvas.saveLayer(
@@ -236,7 +236,7 @@ class _GlassPainter extends CustomPainter {
       14,
       10,
       .5,
-      ((settings.tint ?? (dark ? .52 : .58))
+      ((settings.tint ?? (dark ? .52 : .58)) * (1.0 - .78 * activation)
           + (highContrast ? .12 : 0)).clamp(0.0, 1.0),
       settings.compare ? 1 : 0,
       dpr,

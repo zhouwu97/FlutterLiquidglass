@@ -1,4 +1,4 @@
 interface:
   display_name: "Liquid Glass · 跨平台材质与交互"
-  short_description: "Refractive glass and local elastic pulls across UI frameworks"
-  default_prompt: "Use $flutter-liquid-glass to implement and verify liquid glass for my component and platform, preserving its intended layout and interaction."
+  short_description: "Refractive glass, switch gestures and native interactions"
+  default_prompt: "Use $flutter-liquid-glass to match my reference in the specified destination, preserve confirmed appearance and native behavior, and verify the requested interaction in the demo and host."

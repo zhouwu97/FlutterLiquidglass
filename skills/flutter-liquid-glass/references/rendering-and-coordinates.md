@@ -26,6 +26,8 @@ Trace all painted layers when the user sees white/opaque fill:
 
 Tint is absorption/color; blur is scattering. An opaque white wash plus blur does not become clear glass by adding highlights. Conversely, a clear material can still have intentional mild frost; choose from the user's reference. Preserve readable foreground and opaque accessibility fallbacks.
 
+For a switch, distinguish the rail's color/alpha from the lens's transmission. Preserve a confirmed opaque colored rail while tuning refraction; sample its boundary and the surrounding scene through the deformed lens. Follow the chosen visible-thumb threshold or continuous color policy explicitly. A motion-only request does not authorize changing resting colors or opacity; a requested appearance match names the destination receiving those changes.
+
 ## Paint bounds and resource ownership
 
 Compute worst-case displacement plus antialiasing/filter support, and reserve that draw area independently of layout and hit testing. Inspect ancestor clips and rounded containers in the actual host. A texture export can show correct overflow that is later clipped by the visible control.

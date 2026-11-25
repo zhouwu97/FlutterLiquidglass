@@ -3,8 +3,10 @@
 Design-systems: https://github.com/ruiqichenbiec/design-systems/tree/7a424c93b9be13cf835b91ea67495fec2ec0584e
 Read lens/lab/design-system/internal/jelly.js, jelly-physics.js, optical-motion.js and renderer.js together.
 LocationSpoofer: https://github.com/TaoCultivator/LocationSpoofer/tree/44e1ce221e47499b973fb1a1400fe8e45c9403a8
-Flutter example: https://github.com/zhouwu97/FlutterLiquidglass/tree/2c281279bdde506d65a035442638a90c031bd593
+Historical navigation snapshot: https://github.com/zhouwu97/FlutterLiquidglass/tree/2c281279bdde506d65a035442638a90c031bd593
 Read lib/widgets/liquid_bottom_nav.dart, lib/widgets/liquid_glass/ and shaders/liquid_glass.frag. Check the repository version before copying; host contracts differ.
+
+This document describes the navigation lens only. The bundled example tracks the runnable repository demo; record the source revision before adapting it. For switch taps, overflow, colors and the separate 23-float/one-sampler contract, read [switch-model.md](switch-model.md). Navigation's selection behavior and 29-float/two-sampler layout are not switch defaults.
 
 ## Motion
 
