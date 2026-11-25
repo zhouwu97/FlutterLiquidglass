@@ -22,6 +22,8 @@ public sealed partial class LiquidGlassSurface : Grid
     private UIElement? _connectedInput;
     private LiquidGlassInteraction? _interaction;
     private bool _subscribed;
+    private bool _materialReady;
+    private double _activation;
     private (Point Origin, Point X, Point Y)? _position;
 
     // Material geometry must not use Grid.CornerRadius: that also clips the overflowing optical layer.
@@ -38,6 +40,8 @@ public sealed partial class LiquidGlassSurface : Grid
     public static readonly DependencyProperty DispersionProperty = Register(nameof(Dispersion), typeof(double), .35d);
     public static readonly DependencyProperty TintScaleProperty = Register(nameof(TintScale), typeof(double), 1d);
     public static readonly DependencyProperty ShowSheenProperty = Register(nameof(ShowSheen), typeof(bool), true);
+    public static readonly DependencyProperty PressLensProperty = Register(nameof(PressLens), typeof(bool), false);
+    public static readonly DependencyProperty CompareOnlyProperty = Register(nameof(CompareOnly), typeof(bool), false);
     public static readonly DependencyProperty FallbackOpacityProperty = DependencyProperty.Register(
         nameof(FallbackOpacity), typeof(double), typeof(LiquidGlassSurface), new PropertyMetadata(1d));
 
@@ -53,6 +57,9 @@ public sealed partial class LiquidGlassSurface : Grid
     public double Dispersion { get => (double)GetValue(DispersionProperty); set => SetValue(DispersionProperty, value); }
     public double TintScale { get => (double)GetValue(TintScaleProperty); set => SetValue(TintScaleProperty, value); }
     public bool ShowSheen { get => (bool)GetValue(ShowSheenProperty); set => SetValue(ShowSheenProperty, value); }
+    /// <summary>Show the clear moving-lens material while pressed, above the ordinary resting fill.</summary>
+    public bool PressLens { get => (bool)GetValue(PressLensProperty); set => SetValue(PressLensProperty, value); }
+    public bool CompareOnly { get => (bool)GetValue(CompareOnlyProperty); set => SetValue(CompareOnlyProperty, value); }
 
     private static DependencyProperty Register(string name, Type type, object? value)
         => DependencyProperty.Register(name, type, typeof(LiquidGlassSurface), new PropertyMetadata(value, OnMaterialPropertyChanged));
@@ -136,8 +143,17 @@ public sealed partial class LiquidGlassSurface : Grid
 
     private void PaintInteraction(LiquidSurfaceMotion motion, double x, double y)
     {
+        _activation = Math.Clamp(motion.Pressure, 0, 1);
         _renderer?.SetInteraction(motion.Pressure, x, y);
         _renderer?.SetJellyPose(motion.Stretch, motion.Angle, motion.Lift, motion.BendX, motion.BendY, motion.Energy);
+        UpdatePresentation();
+    }
+
+    private void UpdatePresentation()
+    {
+        double glass = _materialReady ? PressLens ? _activation : 1 : 0;
+        _optics.Opacity = PressLens ? glass : 1;
+        _wash.Opacity = FallbackOpacity = 1 - glass;
     }
 
     private void OnMaterialChanged(object? sender, EventArgs args)
@@ -190,6 +206,13 @@ public sealed partial class LiquidGlassSurface : Grid
         if (_scene is null)
         {
             _optics.Margin = new Thickness(0);
+            if (PressLens)
+            {
+                CompositionBackdropService.Detach(_optics);
+                _materialReady = false;
+                UpdatePresentation();
+                return;
+            }
             bool blurred = Blur && CompositionBackdropService.TryAttach(_optics,
                 Clamp(BlurAmount, 0, 64, 1.5f), Clamp(Saturation, 0, 2, 1.12f), (float)SurfaceCorners.TopLeft);
             if (!blurred) CompositionBackdropService.Detach(_optics);
@@ -200,16 +223,20 @@ public sealed partial class LiquidGlassSurface : Grid
         {
             _optics.Margin = new Thickness(-DeformationPadding);
             _renderer ??= new LiquidGlassRenderer(_optics, _scene, 0,
-                materialReady: ready => _wash.Opacity = FallbackOpacity = ready ? 0 : 1);
+                materialReady: ready => { _materialReady = ready; UpdatePresentation(); });
             CornerRadius c = SurfaceCorners;
             Color tint = Tint is SolidColorBrush brush ? brush.Color
                 : ActualTheme == ElementTheme.Dark ? Color.FromArgb(255, 42, 39, 61) : Color.FromArgb(255, 255, 255, 255);
+            // Large panels use the reference Demo's clear transmission. The window's
+            // stronger Mica/acrylic wash must not turn the optical surface milky.
+            double tintOpacity = _interaction?.Input is GlassPanel
+                ? Math.Min(GlassSettings.TintOpacity, .06) : GlassSettings.TintOpacity;
             _renderer.SetMaterial(new(
                 new GlassCorners((float)c.TopLeft, (float)c.TopRight, (float)c.BottomRight, (float)c.BottomLeft),
                 Blur ? Clamp(BlurAmount, 0, 64, 1.5f) : 0,
                 Clamp(RefractionAmount, 0, 80, 24), Clamp(Saturation, 0, 2, 1.12f), tint,
-                Clamp(GlassSettings.TintOpacity * TintScale, 0, 1, .6f), ShowSheen,
-                Padding: DeformationPadding, Dispersion: Clamp(Dispersion, 0, 1, .35f)));
+                Clamp(tintOpacity * TintScale, 0, 1, .04f), ShowSheen,
+                Padding: DeformationPadding, Dispersion: Clamp(Dispersion, 0, 1, .35f), PressLens: PressLens, CompareOnly: CompareOnly));
             _interaction?.Paint();
         }
         catch (Exception ex)
@@ -236,6 +263,7 @@ public sealed partial class LiquidGlassSurface : Grid
         CompositionBackdropService.Detach(_optics);
         _renderer?.Dispose();
         _renderer = null;
+        _materialReady = false;
         _wash.Opacity = FallbackOpacity = 1;
         _position = null;
     }

@@ -38,6 +38,25 @@ python .\scripts\capture-pointer.py <Demo进程ID> build\pointer-check
 
 它检查实际按住/释放、前台窗口、轨迹位置、正文随动/回原位、拖动按钮不误触、点击一次、键盘激活及输入/选择。被其他输入打断会失败，不能把这次图片当作目标阶段证据。`PrintWindow` 在本环境返回过旧回退层，因此脚本捕获实际可见的客户端区域。
 
+## 放大开关 Demo
+
+```powershell
+.\scripts\run.ps1 -Switch
+```
+
+`src/SwitchDemo` 直接链接 `src/Demo` 中的控件、模板、运动模型与 shader；浅色、深色及四倍预览使用同一份实现。轨道 56×30 DIP、普通滑块 30×24 DIP、按住约 52×32 DIP。开启保持不透明绿色，轻点先在原端鼓起，再滑到另一端收回；自动演示使用相同路径，按最终反馈提速 15%。手动拖动保留原有跟手、取消和松手提交语义。
+
+![实际按住放大开关](../../docs/images/winui-switch-preview.png)
+
+```powershell
+python scripts/capture-toggle-motion.py <放大Demo进程ID> build/switch-tap --toggle-id=LightActual --tap
+python scripts/capture-toggle-motion.py <综合Demo进程ID> build/switch-drag
+python scripts/capture-toggle.py <综合Demo进程ID> build/switch-optics --compare-optics
+python scripts/capture-button.py <综合Demo进程ID> build/button-optics
+```
+
+这些脚本通过真实系统鼠标录制当前可见窗口。开关录制默认不读取业务设置；针对自己的宿主验证取消不写配置时，显式传入 `--cancel --settings-file=<文件>`。
+
 ## 接入自己的组件
 
 - `src/Demo/Controls/`：距离字段 shader、共享场景、渲染器、表面及原生输入观察器。
@@ -51,7 +70,7 @@ python .\scripts\capture-pointer.py <Demo进程ID> build\pointer-check
 
 ## 验证与许可
 
-39 项模型/坐标单测与 21 项 Direct2D GPU 检查。运动轨迹来自 design-systems `7a424c93b9be13cf835b91ea67495fec2ec0584e` 的实际 `JellyController.tick`，逐帧比较跟手、反向、释放和再次抓取；另测宿主的小幅度参数、边界、不同帧率与原点。GPU 检查包括外部 affine 变换不会重复应用、法线映射与滞后弯曲。原生捕获额外检查实际 shader uniform 的逆矩阵有效，防止独立探针通过、宿主却丢失折射。详见[迁移复盘](../../docs/winui-retrospective.md)。
+58 项模型/坐标单测与 36 项 Direct2D GPU 检查。运动轨迹来自 design-systems `7a424c93b9be13cf835b91ea67495fec2ec0584e` 的实际 `JellyController.tick`，逐帧比较跟手、反向、释放和再次抓取；另测宿主的小幅度参数、边界、不同帧率与原点。GPU 检查包括外部 affine 变换不会重复应用、法线映射与滞后弯曲。原生捕获额外检查实际 shader uniform 的逆矩阵有效，防止独立探针通过、宿主却丢失折射。详见[迁移复盘](../../docs/winui-retrospective.md)。
 
 更新参考轨迹（先检出上述精确版本）：
 

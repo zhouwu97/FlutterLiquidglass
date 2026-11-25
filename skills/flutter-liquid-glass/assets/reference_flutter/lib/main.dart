@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'widgets/bottom_nav.dart';
 import 'widgets/liquid_glass/liquid_glass_runtime.dart';
 import 'widgets/liquid_glass/liquid_glass_scene.dart';
+import 'widgets/liquid_glass/liquid_glass_switch.dart';
 
 void main() => runApp(const NavigationDemo());
 
@@ -19,11 +20,36 @@ class _NavigationDemoState extends State<NavigationDemo> {
   bool grid = false;
   bool compare = false;
   bool clear = false;
+  bool switchOn = true;
+  bool switchReady = false;
+  bool reduce = false;
+  final switchScene = LiquidGlassSceneSource();
+  final scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    scroll.addListener(switchScene.frameChanged);
+  }
+
+  @override
+  void dispose() {
+    scroll.dispose();
+    switchScene.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Liquid / 液态玻璃',
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          disableAnimations: MediaQuery.disableAnimationsOf(context) || reduce,
+        ),
+        child: child!,
+      ),
       theme: ThemeData(
         fontFamily: 'NotoSansCJKsc',
         useMaterial3: true,
@@ -37,12 +63,16 @@ class _NavigationDemoState extends State<NavigationDemo> {
           background: Stack(
             fit: StackFit.expand,
             children: [
-              CustomPaint(
-                painter: _Wallpaper(dark: dark, grid: grid),
+              LiquidGlassBackground(
+                source: switchScene,
+                child: CustomPaint(
+                  painter: _Wallpaper(dark: dark, grid: grid),
+                ),
               ),
               SafeArea(
                 bottom: false,
                 child: CustomScrollView(
+                  controller: scroll,
                   slivers: [
                     SliverToBoxAdapter(
                       child: Center(
@@ -216,9 +246,63 @@ class _NavigationDemoState extends State<NavigationDemo> {
                                       onSelected: (v) =>
                                           setState(() => compare = v),
                                     ),
+                                    FilterChip(
+                                      label: const Text('减少动画'),
+                                      selected: reduce,
+                                      onSelected: (v) =>
+                                          setState(() => reduce = v),
+                                    ),
                                   ],
                                 ),
                                 const SizedBox(height: 16),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            '液态玻璃开关',
+                                            style: TextStyle(
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${switchOn ? '已开启' : '已关闭'} · ${switchReady ? '清透折射' : '基础反馈'}',
+                                            key: const ValueKey(
+                                              'switch-demo-state',
+                                            ),
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    LiquidGlassSwitch(
+                                      key: const ValueKey(
+                                        'liquid-glass-switch-demo',
+                                      ),
+                                      value: switchOn,
+                                      onChanged: (value) =>
+                                          setState(() => switchOn = value),
+                                      source: switchScene,
+                                      label: '液态玻璃开关',
+                                      compare: compare,
+                                      onOpticsReadyChanged: (ready) =>
+                                          setState(() => switchReady = ready),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  '轻点：原端鼓起 → 滑向另一端 → 到位收回。\n也可以按住拖动，试试中途反向和松手回弹。',
+                                  style: TextStyle(fontSize: 12, height: 1.7),
+                                ),
+                                const SizedBox(height: 24),
                                 ValueListenableBuilder(
                                   valueListenable: liquidGlassRuntimeStatus,
                                   builder: (context, status, _) => Text(

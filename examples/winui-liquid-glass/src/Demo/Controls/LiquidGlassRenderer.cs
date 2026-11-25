@@ -7,6 +7,7 @@ using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Effects;
 using Microsoft.Graphics.Canvas.UI;
 using Microsoft.Graphics.Canvas.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Foundation;
 using Windows.Graphics.DirectX;
@@ -17,7 +18,8 @@ namespace LiquidGlass.Controls;
 
 internal readonly record struct LiquidGlassMaterial(
     GlassCorners Corners, float Blur, float Refraction, float Saturation, Color Tint, float TintOpacity,
-    bool ShowSheen, float Padding = 0, float Dispersion = .35f, float InteriorEffects = 1);
+    bool ShowSheen, float Padding = 0, float Dispersion = .35f, float InteriorEffects = 1,
+    bool PressLens = false, bool CompareOnly = false, bool LensOptics = false);
 
 /// <summary>GPU surface optics, ported from FlutterLiquidglass. No CPU normal maps or geometry-only deformation.</summary>
 internal sealed class LiquidGlassRenderer : IDisposable
@@ -28,7 +30,13 @@ internal sealed class LiquidGlassRenderer : IDisposable
     private readonly LiquidGlassScene? _labels;
     private readonly Border? _fallback;
     private readonly Action<bool>? _materialReady;
+    private readonly FrameworkElement? _switchTrack;
+    private readonly float _opticalScale;
+    private readonly PixelShaderEffect<SwitchTrackShader>? _trackEffect;
+    private Color _trackColor;
     private readonly CanvasControl _canvas = new() { IsHitTestVisible = false };
+    private readonly CropEffect _sceneCrop = new();
+    private readonly BorderEffect _sceneBorder;
     private readonly Transform2DEffect _sceneEffect = new() { BorderMode = EffectBorderMode.Hard };
     private readonly GaussianBlurEffect _blur;
     private readonly SaturationEffect _saturation;
@@ -49,15 +57,21 @@ internal sealed class LiquidGlassRenderer : IDisposable
 
     public bool HasLabels => !_failed && _labelBitmap is not null;
     public bool HasFailed => _failed;
+    public bool IsReady => _ready && !_failed;
 
     public LiquidGlassRenderer(Grid host, LiquidGlassScene scene, float cornerRadius,
-        Border? fallback = null, LiquidGlassScene? labels = null, Action<bool>? materialReady = null)
+        Border? fallback = null, LiquidGlassScene? labels = null, Action<bool>? materialReady = null,
+        FrameworkElement? switchTrack = null, float opticalScale = 1)
     {
         _host = host;
         _scene = scene;
         _labels = labels;
         _fallback = fallback;
         _materialReady = materialReady;
+        _switchTrack = switchTrack;
+        _opticalScale = opticalScale;
+        _sceneBorder = new BorderEffect { Source = _sceneCrop, ExtendX = CanvasEdgeBehavior.Clamp, ExtendY = CanvasEdgeBehavior.Clamp };
+        _sceneEffect.Source = _sceneBorder;
         _material = new(new GlassCorners(cornerRadius), 6, 24, 1.12f, Color.FromArgb(255, 232, 223, 252), .24f, true);
         _blur = new GaussianBlurEffect { Source = _sceneEffect, BorderMode = EffectBorderMode.Hard, Optimization = EffectOptimization.Balanced };
         _saturation = new SaturationEffect { Source = _blur, Saturation = 1.12f };
@@ -66,7 +80,16 @@ internal sealed class LiquidGlassRenderer : IDisposable
             // Include all displaced samples in the upstream input rectangles.
             TransformMapper = D2D1DrawTransformMapper<LiquidGlassShader>.Inflate(96),
         };
-        _shader.Sources[0] = _saturation;
+        if (switchTrack is not null)
+        {
+            _trackEffect = new PixelShaderEffect<SwitchTrackShader>
+            {
+                TransformMapper = D2D1DrawTransformMapper<SwitchTrackShader>.Inflate(96),
+            };
+            _trackEffect.Sources[0] = _saturation;
+            _shader.Sources[0] = _trackEffect;
+        }
+        else _shader.Sources[0] = _saturation;
         _shader.Sources[1] = _transparent;
         _canvas.CreateResources += OnCreateResources;
         _canvas.Draw += OnDraw;
@@ -74,6 +97,13 @@ internal sealed class LiquidGlassRenderer : IDisposable
         if (_labels is not null) { _labels.Changed += Invalidate; _labels.Invalidate(); }
         _scene.Invalidate();
         host.Children.Add(_canvas);
+    }
+
+    public void SetTrackColor(Color color)
+    {
+        if (_trackColor == color) return;
+        _trackColor = color;
+        Invalidate();
     }
 
     public void SetMaterial(LiquidGlassMaterial material)
@@ -92,7 +122,7 @@ internal sealed class LiquidGlassRenderer : IDisposable
     {
         _backdrop = _labelBitmap = null;
         _version = _labelVersion = -1;
-        _sceneEffect.Source = _glyphs.Source = null;
+        _sceneCrop.Source = _glyphs.Source = null;
         _target?.Dispose();
         _target = null;
         _targetSize = default;
@@ -142,7 +172,9 @@ internal sealed class LiquidGlassRenderer : IDisposable
         if (w < 2 || h < 2) return;
         try
         {
-            float scale = LiquidGlassOptics.TextureScale(w, h, canvas.Dpi);
+            // The switch expands through a native transform. Keep its small texture
+            // sharp at the maximum pressed scale, without reallocating on every frame.
+            float scale = LiquidGlassOptics.TextureScale(w, h, canvas.Dpi * (_switchTrack is null ? 1 : 2));
             int width = Math.Max(1, (int)Math.Ceiling(w * scale)), height = Math.Max(1, (int)Math.Ceiling(h * scale));
             if (_targetSize != (width, height, scale))
             {
@@ -153,10 +185,15 @@ internal sealed class LiquidGlassRenderer : IDisposable
             if (_version != _scene.Version)
             {
                 _backdrop = GetBitmap(_scene, canvas);
-                _sceneEffect.Source = _backdrop;
+                _sceneCrop.Source = _backdrop;
                 _version = _scene.Version;
             }
             if (_backdrop is null) return;
+            // A tall/scrolled card can refract past the captured window. Clamp the
+            // decorative scene's layout extent, excluding transparent capture overflow.
+            _sceneCrop.SourceRectangle = new Rect(0, 0,
+                Math.Min(_backdrop.Size.Width, _scene.Element.ActualWidth * _scene.PixelsPerDip * _backdrop.Size.Width / _scene.Width),
+                Math.Min(_backdrop.Size.Height, _scene.Element.ActualHeight * _scene.PixelsPerDip * _backdrop.Size.Height / _scene.Height));
             if (_labels?.Pixels is not null && _labelVersion != _labels.Version)
             {
                 _labelBitmap = GetBitmap(_labels, canvas);
@@ -167,15 +204,39 @@ internal sealed class LiquidGlassRenderer : IDisposable
             _sceneEffect.TransformMatrix = SourceTransform(canvas, _scene, _backdrop) * Matrix3x2.CreateScale(scale);
             if (_labels is not null && _labelBitmap is not null)
                 _glyphs.TransformMatrix = SourceTransform(canvas, _labels, _labelBitmap) * Matrix3x2.CreateScale(scale);
-            bool lens = _labels is not null;
+            bool switchLens = _switchTrack is not null && _material.LensOptics;
             float activation = Math.Clamp(_pressure, 0, 1);
-            _blur.BlurAmount = _material.Blur * scale * (lens ? 1 - .8f * activation : 1);
-            _saturation.Saturation = _material.Saturation;
+            if (_switchTrack is not null && _trackEffect is not null)
+            {
+                var toTrack = canvas.TransformToVisual(_switchTrack);
+                Point origin = toTrack.TransformPoint(new Point());
+                Point axisX = toTrack.TransformPoint(new Point(1, 0));
+                Point axisY = toTrack.TransformPoint(new Point(0, 1));
+                _trackEffect.ConstantBuffer = new(
+                    new Float4((float)(axisX.X - origin.X), (float)(axisY.X - origin.X),
+                        (float)(axisX.Y - origin.Y), (float)(axisY.Y - origin.Y)),
+                    new Float2((float)origin.X, (float)origin.Y),
+                    new Float2((float)_switchTrack.ActualWidth, (float)_switchTrack.ActualHeight),
+                    new Float4(_trackColor.R / 255f, _trackColor.G / 255f, _trackColor.B / 255f, 1), scale);
+            }
+            bool lens = _labels is not null;
+            bool pressLens = _material.PressLens;
+            _blur.BlurAmount = (pressLens ? Math.Max(LiquidLensPreset.Blur, _material.Blur) : _material.Blur) * scale
+                * (lens || pressLens ? 1 - LiquidLensPreset.PressedBlurReduction * activation : 1);
+            _saturation.Saturation = pressLens ? LiquidLensPreset.Saturation : _material.Saturation;
             var size = new Vector2(Math.Max(1, w - 2 * _material.Padding), Math.Max(1, h - 2 * _material.Padding));
             var pointer = new Float2(_material.Padding + size.X * _light.X, _material.Padding + size.Y * _light.Y);
-            if (lens) size *= new Vector2(1 + .025f * activation, 1 + .39f * activation);
+            if (lens || pressLens) size *= new Vector2(1 + LiquidLensPreset.WidthExpansion * activation,
+                1 + LiquidLensPreset.HeightExpansion * activation);
             GlassCorners corners = _material.Corners.Fit(size.X, size.Y);
             if (lens) corners = new GlassCorners(Math.Min(size.X, size.Y) / 2);
+            if (pressLens)
+            {
+                float radius = Math.Min(size.X, size.Y) / 2;
+                corners = new GlassCorners(
+                    float.Lerp(corners.TopLeft, radius, activation), float.Lerp(corners.TopRight, radius, activation),
+                    float.Lerp(corners.BottomRight, radius, activation), float.Lerp(corners.BottomLeft, radius, activation));
+            }
             float along = 1 + _stretch, across = 1 / along;
             float c = MathF.Cos(_angle), s = MathF.Sin(_angle);
             // Invert the volume-preserving stretch along the actual velocity vector.
@@ -186,15 +247,22 @@ internal sealed class LiquidGlassRenderer : IDisposable
                 (across - along) * c * s / lift, (across * s * s + along * c * c) / lift);
             Color tint = _material.Tint;
             float opacity = _material.TintOpacity * tint.A / 255f * (lens ? 1 : 1 - .12f * activation);
+            if (pressLens)
+            {
+                // Absorption is independent of the ordinary button's fill color.
+                tint = Color.FromArgb(255, 255, 255, 255);
+                opacity = LiquidLensPreset.Tint.W;
+            }
             _shader.ConstantBuffer = new LiquidGlassShader(
                 new Float2(size.X, size.Y), new Float2(w / 2, h / 2),
                 new Float4(corners.TopLeft, corners.TopRight, corners.BottomRight, corners.BottomLeft),
                 pointer, inverse, new Float2(_bend.X, _bend.Y),
                 new Float4(tint.R / 255f, tint.G / 255f, tint.B / 255f, opacity),
-                activation, _material.Refraction * (lens ? 1 : 1 + .25f * activation),
-                _material.Dispersion, _energy, scale, _material.ShowSheen ? .85f : 0,
-                lens && _labelBitmap is not null ? 1 : 0, 0, lens ? 0 : _externalPose ? 2 : 1,
-                new Float2(_grab.X, _grab.Y), _material.InteriorEffects);
+                activation, pressLens ? LiquidLensPreset.Refraction : _material.Refraction * (lens || switchLens ? 1 : 1 + .25f * activation),
+                pressLens ? LiquidLensPreset.Dispersion : _material.Dispersion, _energy, scale, _material.ShowSheen ? .85f : 0,
+                lens && _labelBitmap is not null ? 1 : 0, _material.CompareOnly ? 1 : 0, lens ? 0 : _externalPose ? 2 : 1,
+                new Float2(_grab.X, _grab.Y), pressLens ? 0 : _material.InteriorEffects,
+                _switchTrack is null ? 0 : 1, _opticalScale, pressLens || switchLens ? activation : 0);
             // Complex samplers stay in one physical-pixel space. Final presentation alone uses the XAML DPI.
             using (var draw = _target!.CreateDrawingSession())
             {
@@ -253,10 +321,11 @@ internal sealed class LiquidGlassRenderer : IDisposable
         _host.Children.Remove(_canvas);
         _canvas.RemoveFromVisualTree();
         _shader.Dispose();
+        _trackEffect?.Dispose();
         _target?.Dispose();
         _target = null;
-        _sceneEffect.Source = _glyphs.Source = null;
-        _glyphs.Dispose(); _saturation.Dispose(); _blur.Dispose(); _sceneEffect.Dispose(); _transparent.Dispose();
+        _sceneCrop.Source = _glyphs.Source = null;
+        _glyphs.Dispose(); _saturation.Dispose(); _blur.Dispose(); _sceneEffect.Dispose(); _sceneBorder.Dispose(); _sceneCrop.Dispose(); _transparent.Dispose();
         _backdrop = _labelBitmap = null;
         SetReady(false);
     }

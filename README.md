@@ -1,6 +1,8 @@
 # 液态玻璃：Flutter 与 WinUI
 
-提供 Flutter 移动导航透镜和 Windows 弹性组件两条可运行路径，以及面向不同组件、不同宿主的 [liquid glass skill](skills/flutter-liquid-glass/SKILL.md)。材质与交互分开适配：移动透镜、整块小幅跟手并回原位的卡片、按住时玻璃化的滑动开关。
+提供 Flutter 移动导航与液态玻璃开关、Windows 弹性组件，以及面向不同组件、不同宿主的 [liquid glass skill](skills/flutter-liquid-glass/SKILL.md)。材质与交互分开适配：移动透镜、整块小幅跟手并回原位的卡片、按住时玻璃化的滑动开关。
+
+开关采用绿色／灰色胶囊轨道和白色扁圆滑块。轻点依次在原端鼓起、滑向另一端、到位后收回；也可直接按住拖动和反向回弹。Flutter 网页与 Windows 示例使用相同的阶段时序，点击播放速度已按体验反馈提高 15%。
 
 ## Windows 原生组件与截图
 
@@ -16,6 +18,15 @@ cd examples/winui-liquid-glass
 ```
 
 独立示例不依赖原业务项目，可单独构建；.NET/WinUI 版本与验证命令见示例 README。
+
+单独查看浅色、深色、实际尺寸和放大开关：
+
+```powershell
+cd examples/winui-liquid-glass
+.\scripts\run.ps1 -Switch
+```
+
+![Windows 开关：实际尺寸与按住放大](docs/images/winui-switch-preview.png)
 
 ## 让 AI 接入其他组件
 
@@ -35,7 +46,13 @@ cd examples/winui-liquid-glass
 
 手机可直接触摸底栏，电脑使用鼠标按住选中胶囊拖动。试试慢拖、快速换向和松手回弹；开启「网格背景」与「清透材质」，更容易看清网格、文字和图标经过玻璃时的折射。也可以切换深色模式，或开启「仅模糊对照」比较差异。
 
-以下为当前 Flutter Web 版本的真实运行截图（430 × 932 视口），按压与拖动状态均在指针保持按下时采集。
+网页中新增「液态玻璃开关」：轻点观察完整的鼓起、移动和收回；按住拖动时状态不提前提交。减少动画保留即时切换。开关仅保存在演示内存中。
+
+| 开启态 · 手机布局 | 深色 · 实际按住 |
+| --- | --- |
+| <img src="docs/images/demo-switch-mobile.jpg" width="320" alt="网页中的绿色液态玻璃开关"> | <img src="docs/images/demo-switch-mobile-held.jpg" width="320" alt="深色网页中保持按住的玻璃开关"> |
+
+以下为导航材质的真实运行截图（430 × 932 视口），按压与拖动状态均在指针保持按下时采集。
 
 <table>
   <tr>
@@ -140,6 +157,7 @@ flutter build apk --release
 
 - `lib/widgets/liquid_bottom_nav.dart`：手势、连续位置、可中断弹簧、语义。
 - `lib/widgets/liquid_glass/liquid_glass_dynamics.dart`：移植的六弹簧运动模型、速度和受力到光学形变的映射。
+- `lib/widgets/liquid_glass/liquid_glass_switch.dart` 与 `shaders/liquid_glass_switch.frag`：保留原生输入与语义的玻璃开关、独立轨道合成与连续变形折射。背景必须使用不包含开关自身的独立采样源。
 - `lib/widgets/liquid_glass/liquid_glass_scene.dart`：独立背景和局部 GPU 捕获。
 - `lib/widgets/liquid_glass/liquid_glass_renderer.dart`：纹理生命周期、图集、shader 调用。
 - `shaders/liquid_glass.frag`：底座与选中透镜的完整光学合成。

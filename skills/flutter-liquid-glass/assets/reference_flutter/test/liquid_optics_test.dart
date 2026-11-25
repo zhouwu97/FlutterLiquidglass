@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:bottom_nav_demo/widgets/liquid_glass/liquid_glass_switch.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -7,6 +8,92 @@ import 'package:bottom_nav_demo/widgets/liquid_glass/liquid_glass_renderer.dart'
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+    'trial switch GPU preserves rail color and refracts its deformed boundary',
+    () async {
+      final program = await loadLiquidGlassSwitchProgram();
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder)
+        ..drawColor(const Color(0xffdaebef), BlendMode.src);
+      final pen = Paint()..color = const Color(0xff274766);
+      for (var x = 0; x < 120; x += 11) {
+        canvas.drawRect(Rect.fromLTWH(x.toDouble(), 0, 2, 96), pen);
+      }
+      for (var y = 0; y < 96; y += 11) {
+        canvas.drawRect(Rect.fromLTWH(0, y.toDouble(), 120, 2), pen);
+      }
+      final picture = recorder.endRecording();
+      final scene = await picture.toImage(120, 96);
+      picture.dispose();
+      addTearDown(scene.dispose);
+      Future<Uint8List> render({bool compare = false, double bend = 0}) async {
+        final shader = program.fragmentShader()..setImageSampler(0, scene);
+        final values = <double>[
+          72,
+          48,
+          -24,
+          -24,
+          120,
+          96,
+          46,
+          24,
+          26,
+          16,
+          40,
+          4,
+          1,
+          0,
+          bend,
+          0,
+          .2,
+          compare ? 1 : 0,
+          1,
+          .85,
+          42 / 255,
+          211 / 255,
+          77 / 255,
+        ];
+        for (var i = 0; i < values.length; i++) {
+          shader.setFloat(i, values[i]);
+        }
+        final output = ui.PictureRecorder();
+        Canvas(output).drawRect(
+          const Rect.fromLTWH(0, 0, 120, 96),
+          Paint()..shader = shader,
+        );
+        final imagePicture = output.endRecording();
+        final image = await imagePicture.toImage(120, 96);
+        imagePicture.dispose();
+        shader.dispose();
+        final bytes = (await image.toByteData(
+          format: ui.ImageByteFormat.rawRgba,
+        ))!.buffer.asUint8List();
+        image.dispose();
+        return bytes;
+      }
+
+      final glass = await render(),
+          flat = await render(compare: true),
+          bent = await render(bend: 2);
+      const center = (24 * 120 + 46) * 4;
+      expect(glass[center + 1], greaterThan(195));
+      expect(glass[center], lessThan(65));
+      expect(glass[3], 0);
+      var optical = 0.0, silhouette = 0.0;
+      for (var y = 6; y < 42; y++) {
+        for (var x = 15; x < 78; x++) {
+          final at = (y * 120 + x) * 4;
+          for (var c = 0; c < 3; c++) {
+            optical += (glass[at + c] - flat[at + c]).abs();
+          }
+          expect(glass[at + 3], flat[at + 3]);
+          silhouette += (glass[at + 3] - bent[at + 3]).abs();
+        }
+      }
+      expect(optical / (36 * 63 * 3), greaterThan(2));
+      expect(silhouette / (36 * 63), greaterThan(1));
+    },
+  );
 
   test('GPU lens displaces sampled pixels and preserves alpha', () async {
     final program = await loadLiquidGlassProgram();

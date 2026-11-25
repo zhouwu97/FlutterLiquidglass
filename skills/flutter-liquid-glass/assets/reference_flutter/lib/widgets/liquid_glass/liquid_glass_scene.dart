@@ -6,7 +6,7 @@ import 'package:flutter/scheduler.dart';
 
 /// The background is recorded separately, so glass can never sample itself.
 /// Put the entire scrollable page in [background], and the navigation in [overlay].
-class LiquidGlassScene extends StatefulWidget {
+class LiquidGlassScene extends StatelessWidget {
   const LiquidGlassScene({
     super.key,
     required this.background,
@@ -20,11 +20,52 @@ class LiquidGlassScene extends StatefulWidget {
       context.dependOnInheritedWidgetOfExactType<_SceneScope>()?.source;
 
   @override
-  State<LiquidGlassScene> createState() => _LiquidGlassSceneState();
+  Widget build(BuildContext context) => LiquidGlassScope(
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        LiquidGlassBackground(child: background),
+        overlay,
+      ],
+    ),
+  );
 }
 
-class _LiquidGlassSceneState extends State<LiquidGlassScene> {
+/// Keeps Scaffold's bottom-bar layout and body MediaQuery intact while sharing
+/// the separately recorded page with a navigation in bottomNavigationBar.
+class LiquidGlassScope extends StatefulWidget {
+  const LiquidGlassScope({
+    super.key,
+    required this.child,
+    this.composeWithParent = false,
+  });
+  final Widget child;
+  final bool composeWithParent;
+  @override
+  State<LiquidGlassScope> createState() => _LiquidGlassScopeState();
+}
+
+class LiquidGlassBackground extends StatelessWidget {
+  const LiquidGlassBackground({super.key, required this.child, this.source});
+  final Widget child;
+  final LiquidGlassSceneSource? source;
+  @override
+  Widget build(BuildContext context) {
+    final captureSource = source ?? LiquidGlassScene.maybeOf(context)!;
+    return _CaptureBoundary(key: captureSource.key, child: child);
+  }
+}
+
+class _LiquidGlassScopeState extends State<LiquidGlassScope> {
   final source = LiquidGlassSceneSource();
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    source.underlay = widget.composeWithParent
+        ? LiquidGlassScene.maybeOf(context)
+        : null;
+  }
 
   @override
   void initState() {
@@ -45,16 +86,8 @@ class _LiquidGlassSceneState extends State<LiquidGlassScene> {
   }
 
   @override
-  Widget build(BuildContext context) => _SceneScope(
-    source: source,
-    child: Stack(
-      fit: StackFit.expand,
-      children: [
-        _CaptureBoundary(key: source.key, child: widget.background),
-        widget.overlay,
-      ],
-    ),
-  );
+  Widget build(BuildContext context) =>
+      _SceneScope(source: source, child: widget.child);
 }
 
 class _SceneScope extends InheritedWidget {
@@ -91,6 +124,7 @@ class _RenderCaptureBoundary extends RenderRepaintBoundary {
 
 class LiquidGlassSceneSource extends ChangeNotifier {
   final key = GlobalKey();
+  LiquidGlassSceneSource? underlay;
   bool _disposed = false;
 
   void frameChanged() {
@@ -109,7 +143,36 @@ class LiquidGlassSceneSource extends ChangeNotifier {
     if (bounds.isEmpty) return null;
     final image = background.captureRegion(bounds, dpr.clamp(1.0, 2.0));
     if (image == null) return null;
-    return LiquidGlassCapture(image, bounds.shift(-origin));
+    final rect = bounds.shift(-origin);
+    final behind = underlay?.capture(glass, localBounds, dpr);
+    if (behind == null) return LiquidGlassCapture(image, rect);
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final scale = dpr.clamp(1.0, 2.0);
+    canvas.scale(scale);
+    canvas.translate(-behind.rect.left, -behind.rect.top);
+    canvas.drawImageRect(
+      behind.image,
+      Offset.zero &
+          Size(behind.image.width.toDouble(), behind.image.height.toDouble()),
+      behind.rect,
+      Paint(),
+    );
+    canvas.drawImageRect(
+      image,
+      Offset.zero & Size(image.width.toDouble(), image.height.toDouble()),
+      rect,
+      Paint(),
+    );
+    final picture = recorder.endRecording();
+    final composited = picture.toImageSync(
+      behind.image.width,
+      behind.image.height,
+    );
+    picture.dispose();
+    image.dispose();
+    behind.image.dispose();
+    return LiquidGlassCapture(composited, behind.rect);
   }
 
   @override

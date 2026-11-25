@@ -46,6 +46,7 @@ public sealed partial class MainWindow : Window
     private bool _dirty = true, _running, _saving, _capturePending;
     private readonly string? _captureDirectory;
     private LiquidGlassScene? _nativeScene;
+    private LiquidGlassToggleSwitch? _nativeToggle;
 
     public MainWindow()
     {
@@ -76,15 +77,17 @@ public sealed partial class MainWindow : Window
 
     private void BuildUI()
     {
-        Title = "WinUI · Liquid Glass Lab";
+        Title = "LiquidGlass · Liquid Glass Lab";
         Root.Background = new SolidColorBrush(Rgb(248, 249, 252));
         foreach (var height in new[] { GridLength.Auto, GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto })
             Root.RowDefinitions.Add(new RowDefinition { Height = height });
         var header = new StackPanel { Spacing = 5 };
         header.Children.Add(new TextBlock { Text = "液态玻璃 · 独立实验", FontSize = 27 });
-        header.Children.Add(new TextBlock { Text = "左侧透镜演示移动折射；右侧应用卡片跟随拖动、拉伸，松手弹回。内部按钮和输入框保持正常。", TextWrapping = TextWrapping.Wrap, Opacity = .7 });
+        header.Children.Add(new TextBlock { Text = "左侧拖动透镜观察折射；右侧按钮按住变为同款玻璃透镜，松手恢复。卡片可拖动回弹，输入框保持正常。", TextWrapping = TextWrapping.Wrap, Opacity = .7 });
         Root.Children.Add(header);
         var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16 };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(Compare, "BlurOnly");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(Reduce, "ReduceMotion");
         var replay = new Button { Content = "自动演示" };
         replay.Click += OnReplay;
         toolbar.Children.Add(replay);
@@ -164,6 +167,10 @@ public sealed partial class MainWindow : Window
             Foreground = new SolidColorBrush(Rgb(239, 239, 248)) });
         var test = new Button { Content = "测试按钮 · 0", HorizontalAlignment = HorizontalAlignment.Stretch,
             Style = (Style)Application.Current.Resources["SecondaryButtonStyle"] };
+        test.Loaded += (_, _) =>
+        {
+            foreach (var surface in FindSurfaces(test)) surface.PressLens = true;
+        };
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(test, "AnchoredButton");
         int clicks = 0;
         test.Click += (_, _) => test.Content = $"测试按钮 · {++clicks}";
@@ -176,6 +183,7 @@ public sealed partial class MainWindow : Window
             Foreground=new SolidColorBrush(Rgb(255,255,255)) });
         var toggle=new LiquidGlassToggleSwitch { HorizontalAlignment=HorizontalAlignment.Right,
             Style=(Style)Application.Current.Resources["LiquidGlassToggleStyle"] };
+        _nativeToggle = toggle;
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(toggle,"GlassToggle");
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(toggle,"拖动开关");
         toggleRow.Children.Add(toggle); content.Children.Add(toggleRow);
@@ -222,7 +230,23 @@ public sealed partial class MainWindow : Window
         _dirty = true;
         if (Reduce.IsChecked == true) _motion.Snap(_target);
         LiquidGlass.Services.MotionService.SetReduceMotion(Reduce.IsChecked == true);
+        foreach (var surface in FindSurfaces(Root))
+        {
+            surface.CompareOnly = Compare.IsChecked == true;
+            surface.BlurAmount = Frost.IsChecked == true ? 6 : .25;
+        }
+        if (_nativeToggle is not null) _nativeToggle.CompareOnly = Compare.IsChecked == true;
         Canvas.Invalidate();
+    }
+
+    private static IEnumerable<LiquidGlassSurface> FindSurfaces(DependencyObject parent)
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is LiquidGlassSurface surface) yield return surface;
+            foreach (var descendant in FindSurfaces(child)) yield return descendant;
+        }
     }
 
     private static Color Rgb(byte r, byte g, byte b) => Color.FromArgb(255, r, g, b);
@@ -292,14 +316,15 @@ public sealed partial class MainWindow : Window
             var inverse = new Float4(across * c * c + along * s * s, (across - along) * c * s,
                 (across - along) * c * s, across * s * s + along * c * c);
             bool dark = Dark.IsChecked == true;
-            float frost = Frost.IsChecked == true ? 6 : .6f;
-            _blur.BlurAmount = frost * scale * (1 - .8f * Math.Min(press, 1));
-            var tint = dark ? new Float4(.08f, .09f, .14f, .04f) : new Float4(1, 1, 1, .03f);
+            float frost = Frost.IsChecked == true ? 6 : LiquidLensPreset.Blur;
+            _blur.BlurAmount = frost * scale * (1 - LiquidLensPreset.PressedBlurReduction * Math.Min(press, 1));
+            Vector4 lensTint = dark ? LiquidLensPreset.DarkTint : LiquidLensPreset.Tint;
+            var tint = new Float4(lensTint.X, lensTint.Y, lensTint.Z, lensTint.W);
             var center = new Float2(135 + (float)_motion.Position, h * .55f + (float)_motion.Cross);
-            _glass.ConstantBuffer = new(new Float2(190 * (1 + .025f * press), 76 * (1 + .39f * press)), center,
+            _glass.ConstantBuffer = new(new Float2(190 * (1 + LiquidLensPreset.WidthExpansion * press), 76 * (1 + LiquidLensPreset.HeightExpansion * press)), center,
                 new Float4(60, 60, 60, 60), new Float2((float)_pointerX, (float)_pointerY), inverse,
-                new Float2((float)_motion.Bend, (float)_motion.CrossBend), tint, press, 14, .5f,
-                (float)_motion.Energy, scale, .85f, 1, Compare.IsChecked == true ? 1 : 0);
+                new Float2((float)_motion.Bend, (float)_motion.CrossBend), tint, press, LiquidLensPreset.Refraction, LiquidLensPreset.Dispersion,
+                (float)_motion.Energy, scale, LiquidLensPreset.Sheen, 1, Compare.IsChecked == true ? 1 : 0);
             _card.ConstantBuffer = new(new Float2(168, 54), new Float2(w - 140, h - 91),
                 new Float4(16, 16, 16, 16), new Float2((float)_pointerX, (float)_pointerY),
                 new Float4(1, 0, 0, 1), new Float2(0, 0), tint, 0, 18, .3f, 0, scale, .65f, 1,
@@ -365,7 +390,11 @@ public sealed partial class MainWindow : Window
         _lastTick = Stopwatch.GetTimestamp();
         _timer.Start();
     }
-    private void OnReplay(object sender, RoutedEventArgs args) => StartReplay();
+    private async void OnReplay(object sender, RoutedEventArgs args)
+    {
+        StartReplay();
+        if (_nativeToggle is not null) await _nativeToggle.ReplayAsync();
+    }
     private void StartReplay()
     {
         _pointer = null;

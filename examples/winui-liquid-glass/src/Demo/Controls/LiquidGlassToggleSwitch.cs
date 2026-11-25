@@ -21,6 +21,16 @@ public sealed partial class LiquidGlassToggleSwitch : Control
     public static readonly DependencyProperty IsOnProperty=DependencyProperty.Register(nameof(IsOn),typeof(bool),typeof(LiquidGlassToggleSwitch),new PropertyMetadata(false,OnIsOnChanged));
     public bool IsOn { get=>(bool)GetValue(IsOnProperty); set=>SetValue(IsOnProperty,value); }
     public event RoutedEventHandler? Toggled;
+    public static readonly DependencyProperty UseLensOpticsProperty = DependencyProperty.Register(
+        nameof(UseLensOptics), typeof(bool), typeof(LiquidGlassToggleSwitch), new PropertyMetadata(false, OnOpticsChanged));
+    public bool UseLensOptics { get => (bool)GetValue(UseLensOpticsProperty); set => SetValue(UseLensOpticsProperty, value); }
+    public static readonly DependencyProperty CompareOnlyProperty = DependencyProperty.Register(
+        nameof(CompareOnly), typeof(bool), typeof(LiquidGlassToggleSwitch), new PropertyMetadata(false, OnOpticsChanged));
+    public bool CompareOnly { get => (bool)GetValue(CompareOnlyProperty); set => SetValue(CompareOnlyProperty, value); }
+    private static void OnOpticsChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
+        => ((LiquidGlassToggleSwitch)sender).ApplyMaterial();
+    // The isolated preview renders the same control at native resolution.
+    internal double PreviewScale { get; set; } = 1;
     private static void OnIsOnChanged(DependencyObject sender,DependencyPropertyChangedEventArgs args)
     {
         var toggle=(LiquidGlassToggleSwitch)sender;
@@ -39,7 +49,8 @@ public sealed partial class LiquidGlassToggleSwitch : Control
     private LiquidGlassScene? _scene;
     private uint? _pointer;
     private long _lastTick;
-    private bool _animating, _keyHeld, _subscribed, _opticalReady;
+    private bool _animating, _keyHeld, _subscribed, _opticalReady, _replaying, _opticalGesture;
+    private double _lightX = .3, _lightY = .1;
 
     public LiquidGlassToggleSwitch()
     {
@@ -65,7 +76,18 @@ public sealed partial class LiquidGlassToggleSwitch : Control
         _track=GetTemplateChild("PART_Track") as Grid; _thumb=GetTemplateChild("PART_Thumb") as Grid;
         _fill=GetTemplateChild("PART_Fill") as Border; _solid=GetTemplateChild("PART_Solid") as Border;
         _glass=GetTemplateChild("PART_Glass") as Grid;
-        if (_thumb is not null) _thumb.RenderTransform=_pose;
+        double scale = PreviewScale;
+        MinWidth = 56 * scale;
+        MinHeight = 44 * scale;
+        if (_track is not null) { _track.Width = 56 * scale; _track.Height = 44 * scale; }
+        if (_thumb is not null)
+        {
+            _thumb.Width = 30 * scale; _thumb.Height = 24 * scale;
+            _thumb.Margin = new Thickness(3 * scale, 0, 0, 0); _thumb.RenderTransform = _pose;
+        }
+        if (_fill is not null) { _fill.Height = 30 * scale; _fill.CornerRadius = new CornerRadius(15 * scale); }
+        if (_solid is not null) _solid.CornerRadius = new CornerRadius(12 * scale);
+        if (_glass is not null) _glass.Margin = new Thickness(-10 * scale);
         _motion.SetState(IsOn,true); Paint();
     }
     protected override void OnPointerPressed(PointerRoutedEventArgs e)
@@ -74,13 +96,18 @@ public sealed partial class LiquidGlassToggleSwitch : Control
         var p=e.GetCurrentPoint(_track);
         if (p.PointerDeviceType==Microsoft.UI.Input.PointerDeviceType.Mouse && !p.Properties.IsLeftButtonPressed) return;
         if (!CapturePointer(e.Pointer)) return;
-        Focus(FocusState.Pointer); _pointer=p.PointerId; _motion.Press(p.Position.X);
+        Focus(FocusState.Pointer); _pointer=p.PointerId;
+        _opticalGesture = true;
+        _motion.Press(p.Position.X / PreviewScale, p.Position.Y / PreviewScale);
+        UpdateLight(e);
         EnsureRenderer(); Wake(); e.Handled=true;
     }
     protected override void OnPointerMoved(PointerRoutedEventArgs e)
     {
         if (_pointer!=e.Pointer.PointerId || _track is null) return;
-        _motion.Pull(e.GetCurrentPoint(_track).Position.X); Wake(); e.Handled=true;
+        var point = e.GetCurrentPoint(_track).Position;
+        _motion.Pull(point.X / PreviewScale, point.Y / PreviewScale);
+        UpdateLight(e); Wake(); e.Handled=true;
     }
     protected override void OnPointerReleased(PointerRoutedEventArgs e)
     {
@@ -103,38 +130,74 @@ public sealed partial class LiquidGlassToggleSwitch : Control
     protected override void OnKeyUp(KeyRoutedEventArgs e) { _keyHeld=false; base.OnKeyUp(e); }
     private void Cancel()
     {
-        _pointer=null; _motion.Release(true); ReleasePointerCaptures(); Wake();
+        _pointer=null; _opticalGesture=false; _motion.Release(true); ReleasePointerCaptures(); Wake();
     }
     private void EnsureRenderer()
     {
-        if (_renderer is not null || _glass is null || GlassSettings.IsSolid || MotionService.ReduceMotion) return;
+        if (_renderer is not null || _glass is null || _track is null || GlassSettings.IsSolid || MotionService.ReduceMotion) return;
         var scene=LiquidGlassScope.Find(this);
         if (scene is null) return;
         try
         {
             _scene=scene;
-            _renderer=new LiquidGlassRenderer(_glass,scene,12,materialReady: ready=>{_opticalReady=ready;Paint();});
-            _renderer.SetMaterial(new(new GlassCorners(12),0,12,1,Color.FromArgb(255,255,255,255),.015f,true,8,.25f,0));
+            _renderer=new LiquidGlassRenderer(_glass,scene,12,materialReady: ready=>{_opticalReady=ready;Paint();},
+                switchTrack: _track, opticalScale: (float)PreviewScale);
+            ApplyMaterial();
         }
         catch { DisposeRenderer(); }
+    }
+    private void ApplyMaterial()
+    {
+        _motion.Elastic = UseLensOptics;
+        _renderer?.SetMaterial(new(new GlassCorners((float)(12 * PreviewScale)), 0,
+            (UseLensOptics ? LiquidLensPreset.Refraction : 8) * (float)PreviewScale, 1,
+            Color.FromArgb(255, 255, 255, 255), .012f, true, (float)(10 * PreviewScale), .5f, 0,
+            CompareOnly: CompareOnly, LensOptics: UseLensOptics));
+    }
+    private void UpdateLight(PointerRoutedEventArgs args)
+    {
+        if (_thumb is null) return;
+        var point = args.GetCurrentPoint(_thumb).Position;
+        _lightX = Math.Clamp(point.X / Math.Max(1, _thumb.ActualWidth), 0, 1);
+        _lightY = Math.Clamp(point.Y / Math.Max(1, _thumb.ActualHeight), 0, 1);
     }
     private void Paint()
     {
         if (_track is null || _thumb is null || _fill is null || _solid is null || _glass is null) return;
-        double progress=_motion.Progress, pressure=MotionService.ReduceMotion?0:Math.Min(1,_motion.Pressure);
+        double progress=_motion.TrackProgress, pressure=MotionService.ReduceMotion?0:Math.Min(1,_motion.Pressure);
         bool dark=ActualTheme==ElementTheme.Dark;
         Color off=dark?Color.FromArgb(255,91,88,106):Color.FromArgb(255,207,203,211);
-        Color on=Color.FromArgb(255,82,61,116);
+        Color on=Color.FromArgb(255,42,211,77);
         byte Blend(byte a,byte b)=>(byte)Math.Round(a+(b-a)*progress);
         _fill.Background=new SolidColorBrush(Color.FromArgb(255,Blend(off.R,on.R),Blend(off.G,on.G),Blend(off.B,on.B)));
-        double scale=MotionService.ReduceMotion?1:_motion.ScaleX;
-        double extra=(scale-1)*20/2;
-        _pose.TranslateX=Math.Clamp(_motion.Position,extra,22-extra); _pose.ScaleX=scale; _pose.ScaleY=1/scale;
+        double sx=MotionService.ReduceMotion?1:_motion.ScaleX, sy=MotionService.ReduceMotion?1:_motion.ScaleY;
+        _pose.TranslateX=_motion.Position * PreviewScale; _pose.ScaleX=sx; _pose.ScaleY=sy;
         bool optical=_opticalReady && _renderer is {HasFailed:false} && !GlassSettings.IsSolid;
-        _glass.Opacity=optical?pressure:.001; _solid.Opacity=1-(optical?pressure:0);
-        _renderer?.SetInteraction(pressure,.3,.1);
-        _renderer?.SetJellyPose(scale-1,0,1,0,0,scale-1);
+        double glass = MotionService.ReduceMotion ? 0
+            : Math.Clamp(pressure + (_opticalGesture ? _motion.Energy * 2 : 0), 0, 1);
+        _glass.Opacity=optical?glass:.001; _solid.Opacity=1-(optical?glass:0);
+        _renderer?.SetInteraction(pressure,_lightX,_lightY);
+        double lift=Math.Sqrt(sx*sy), stretch=Math.Sqrt(sx/sy)-1;
+        _renderer?.SetTrackColor(((SolidColorBrush)_fill.Background).Color);
+        _renderer?.SetJellyPose(stretch,0,lift,_motion.BendX * PreviewScale,_motion.BendY * PreviewScale,_motion.Energy);
         Opacity=IsEnabled?1:.4;
+    }
+    internal async Task ReplayAsync()
+    {
+        if (_pointer.HasValue || _replaying) return;
+        _replaying = true;
+        try
+        {
+            _opticalGesture = true;
+            _motion.Press(0, 22); EnsureRenderer();
+            IsOn = _motion.Release(); Wake();
+            while (IsLoaded && !_pointer.HasValue && _motion.Moving && !MotionService.ReduceMotion)
+                await Task.Delay(16);
+        }
+        finally
+        {
+            _replaying = false;
+        }
     }
     private void Wake()
     {
@@ -146,6 +209,7 @@ public sealed partial class LiquidGlassToggleSwitch : Control
     private void OnFrame(object? sender,object args)
     {
         long now=Stopwatch.GetTimestamp(); _motion.Advance(Stopwatch.GetElapsedTime(_lastTick,now).TotalSeconds);_lastTick=now;
+        if (!_motion.Moving && !_motion.Held) _opticalGesture = false;
         Paint(); if(!_motion.Moving)Stop();
     }
     private void Stop() {if(_animating)CompositionTarget.Rendering-=OnFrame;_animating=false;}

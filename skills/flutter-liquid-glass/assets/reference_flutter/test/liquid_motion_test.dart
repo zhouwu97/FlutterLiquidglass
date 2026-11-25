@@ -2,9 +2,151 @@ import 'package:bottom_nav_demo/main.dart';
 import 'package:bottom_nav_demo/widgets/liquid_glass/liquid_glass_renderer.dart';
 import 'package:bottom_nav_demo/widgets/liquid_glass/liquid_glass_dynamics.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:bottom_nav_demo/widgets/liquid_glass/liquid_glass_scene.dart';
+import 'package:bottom_nav_demo/widgets/liquid_glass/liquid_glass_switch.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  for (final fps in [30, 60, 120]) {
+    for (final on in [false, true]) {
+      testWidgets('tap rises, travels and releases in order $fps fps on=$on', (
+        tester,
+      ) async {
+        final motion = LiquidGlassDynamics(vsync: tester, index: on ? 1 : 0)
+          ..configure(20);
+        addTearDown(motion.dispose);
+        motion.grab();
+        motion.tapTo(on ? 0 : 1);
+        var lifted = false, arrived = false, shrank = false;
+        var previous = 0.0;
+        for (var i = 0; i < fps * 2; i++) {
+          motion.advance(1 / fps);
+          final travel = on ? 1 - motion.position : motion.position;
+          expect(travel, greaterThanOrEqualTo(previous - .001));
+          if (travel < .02 && motion.pressure >= .8) lifted = true;
+          if (travel > .94 && motion.pressure >= .9) arrived = true;
+          if (arrived && motion.pressure < .5) {
+            expect(travel, greaterThan(.97));
+            shrank = true;
+          }
+          previous = travel;
+        }
+        expect(lifted && arrived && shrank, isTrue);
+        expect(motion.isMoving, isFalse);
+        expect(motion.pressure, 0);
+      });
+    }
+  }
+
+  testWidgets(
+    'trial switch keeps native commit, keyboard and disabled semantics',
+    (tester) async {
+      final source = LiquidGlassSceneSource();
+      addTearDown(source.dispose);
+      var value = false, enabled = true, changes = 0;
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return Scaffold(
+                body: Center(
+                  child: LiquidGlassSwitch(
+                    label: 'trial switch',
+                    source: source,
+                    value: value,
+                    onChanged: enabled
+                        ? (next) => setState(() {
+                            value = next;
+                            changes++;
+                          })
+                        : null,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      final control = find.byType(LiquidGlassSwitch);
+      final gesture = await tester.startGesture(tester.getCenter(control));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(changes, 0);
+      await gesture.moveBy(const Offset(35, 0));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(changes, 0);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(value, isTrue);
+      expect(changes, 1);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+      expect(value, isFalse);
+      expect(changes, 2);
+      rebuild(() => enabled = false);
+      await tester.pumpAndSettle();
+      await tester.tap(control);
+      await tester.pumpAndSettle();
+      expect(changes, 2);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
+    'unavailable scene retains native fallback and vertical scroll cancels preview',
+    (tester) async {
+      final source = LiquidGlassSceneSource();
+      final scroll = ScrollController();
+      addTearDown(source.dispose);
+      addTearDown(scroll.dispose);
+      var changes = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ListView(
+              controller: scroll,
+              children: [
+                const SizedBox(height: 180),
+                Center(
+                  child: LiquidGlassSwitch(
+                    label: 'trial switch',
+                    source: source,
+                    value: false,
+                    onChanged: (_) => changes++,
+                  ),
+                ),
+                const SizedBox(height: 1200),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final control = find.byType(LiquidGlassSwitch);
+      final native = find.descendant(
+        of: control,
+        matching: find.byType(Switch),
+      );
+      final opacity = find.ancestor(of: native, matching: find.byType(Opacity));
+      expect(tester.widget<Opacity>(opacity.first).opacity, 1);
+      final cancel = await tester.startGesture(tester.getCenter(control));
+      await tester.pump(const Duration(milliseconds: 120));
+      await cancel.cancel();
+      await tester.pumpAndSettle();
+      expect(changes, 0);
+      await tester.drag(control, const Offset(0, -90));
+      await tester.pumpAndSettle();
+      expect(scroll.offset, greaterThan(0));
+      expect(changes, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
   testWidgets(
     'same distance at different speeds produces different optical deformation',
     (tester) async {

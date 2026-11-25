@@ -16,7 +16,7 @@ internal readonly partial struct LiquidGlassShader(
     Float2 size, Float2 center, Float4 corners, Float2 pointer, Float4 inverse,
     Float2 bend, Float4 tint, float pressure, float refraction, float dispersion,
     float energy, float dpiScale, float sheen, float foreground, float compare, float anchored = 0, Float2 grab = default,
-    float interiorEffects = 1) : ID2D1PixelShader
+    float interiorEffects = 1, float capsule = 0, float opticalScale = 1, float lens = 0) : ID2D1PixelShader
 {
     private float Distance(Float2 point)
     {
@@ -43,6 +43,15 @@ internal readonly partial struct LiquidGlassShader(
         }
         float r = p.Y < 0 ? (p.X < 0 ? corners.X : corners.Y) : (p.X < 0 ? corners.W : corners.Z);
         r = Hlsl.Min(r, Hlsl.Min(half.X, half.Y));
+        if (capsule > .5f)
+        {
+            // Round the ends in physical coordinates after native expansion.
+            // Stretching the resting thumb's radius would make the lens pointed.
+            Float2 expansion = new(1 / Hlsl.Max(inverse.X, .001f), 1 / Hlsl.Max(inverse.W, .001f));
+            p *= expansion;
+            half *= expansion;
+            r = Hlsl.Min(half.X, half.Y);
+        }
         Float2 q = Hlsl.Abs(p) - half + r;
         return Hlsl.Min(Hlsl.Max(q.X, q.Y), 0) + Hlsl.Length(Hlsl.Max(q, new Float2(0, 0))) - r;
     }
@@ -95,27 +104,42 @@ internal readonly partial struct LiquidGlassShader(
             Float2 worldNormal = new(inverse.X * n.X + inverse.Z * n.Y, inverse.Y * n.X + inverse.W * n.Y);
             float magnitude = Hlsl.Max(Hlsl.Length(worldNormal), .0001f);
             n = worldNormal / magnitude;
-            d /= magnitude;
+            if (capsule < .5f) d /= magnitude;
         }
         float mask = 1 - Hlsl.SmoothStep(-.65f / dpiScale, .65f / dpiScale, d);
         if (mask < .0001f) return new Float4(0, 0, 0, 0);
         Float2 q = p - center;
         Float2 radial = q / Hlsl.Max(Hlsl.Length(q), .0001f);
-        Float2 opticalNormal = n + radial * foreground;
+        // Optical curvature belongs to the material, independently of refracted text.
+        // Native button labels stay crisp while using the same lens as the moving demo.
+        Float2 opticalNormal = n + radial * Hlsl.Max(foreground, lens);
         opticalNormal /= Hlsl.Max(Hlsl.Length(opticalNormal), .0001f);
         // Keep the lens' curved optical footprint visible on large cards as well as capsules.
-        float height = anchored > 1.5f ? Hlsl.Clamp(Hlsl.Min(size.X, size.Y) * .22f, 12, 40)
+        float height = anchored > 1.5f ? Hlsl.Clamp(Hlsl.Min(size.X, size.Y) * .22f, 12 * opticalScale, 40 * opticalScale)
             : Hlsl.Min(16, Hlsl.Min(size.X, size.Y) * .30f);
+        height = Hlsl.Lerp(height, Hlsl.Min(16, Hlsl.Min(size.X, size.Y) * .30f), lens);
         float band = Hlsl.Saturate(1 + d / Hlsl.Max(height, .001f));
         float circle = 1 - Hlsl.Sqrt(Hlsl.Max(0, 1 - band * band));
-        Float2 offset = -opticalNormal * circle * refraction * (1 + energy * .12f) * (1 - compare);
+        // Capsule geometry and optical direction are independent. Switch
+        // lenses share the moving lens' inward sampling, even after native expansion.
+        Float2 offset = opticalNormal * (capsule > .5f ? Hlsl.Lerp(1, -1, lens) : -1)
+            * circle * refraction * (1 + energy * .12f) * (1 - compare);
         if (anchored > 1.5f)
             offset = new Float2(inverse.X * offset.X + inverse.Y * offset.Y, inverse.Z * offset.X + inverse.W * offset.Y);
         Float2 at = p + offset;
+        if (capsule > .5f)
+        {
+            // A small lens needs body curvature as well as a narrow contact bevel.
+            // This elliptical thickness profile magnifies the center continuously
+            // and bends straight scene lines through the body, fading to its rim.
+            Float2 uv = q / Hlsl.Max(size * .5f, new Float2(1, 1));
+            float thickness = Hlsl.Saturate(1 - Hlsl.Dot(uv, uv));
+            at -= q * (.28f * lens * thickness * (1 - compare));
+        }
         float spread = dispersion * q.X * q.Y / Hlsl.Max(size.X * size.Y * .25f, 1);
         Float2 split = offset * spread;
         // Keep spectral fringes within a small optical footprint, particularly on sharp text.
-        split *= Hlsl.Min(1, 2.5f / Hlsl.Max(Hlsl.Length(split), .0001f));
+        split *= Hlsl.Min(1, 2.5f * opticalScale / Hlsl.Max(Hlsl.Length(split), .0001f));
         Float3 r = Sample(at + split);
         Float3 o = Sample(at + split * (2f / 3));
         Float3 y = Sample(at + split * (1f / 3));
@@ -125,7 +149,7 @@ internal readonly partial struct LiquidGlassShader(
         Float3 v = Sample(at - split);
         Float3 color = new((r.R + o.R + y.R) / 3.5f + v.R / 7,
             o.G / 7 + (y.G + g.G + cyan.G) / 3.5f, (cyan.B + b.B + v.B) / 3);
-        color += Light(d, n);
+        color += Light(d / opticalScale, n);
         float glint = Hlsl.Exp(-Hlsl.Length((p - pointer) / new Float2(90, 70)) * 2);
         color += glint * .035f * pressure * interiorEffects * (1 - compare);
         return new Float4(Hlsl.Saturate(color) * mask, mask);

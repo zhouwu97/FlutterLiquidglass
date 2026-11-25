@@ -27,7 +27,7 @@ internal static class NativeCapture
             var renderer = Read<LiquidGlassRenderer>(surface, "_renderer");
             var controller = Read<LiquidGlassInteraction>(surface, "_interaction");
             var motion = Read<LiquidSurfaceMotion>(controller, "_motion");
-            if (renderer.HasFailed || surface.FallbackOpacity != 0) throw new InvalidOperationException("Native glass is using a fallback.");
+            if (!renderer.IsReady) throw new InvalidOperationException("Native glass is using a fallback.");
             string prefix = index == 0 ? "native-card" : "native-button";
             controller.Reset();
             Point initial = controller.Input.TransformToVisual(root).TransformPoint(new Point());
@@ -52,7 +52,7 @@ internal static class NativeCapture
                     throw new InvalidOperationException("Tether did not return to its original position.");
                 trace.Add(new { surface = prefix, phase, motion.Held, motion.PositionX, motion.PositionY,
                     motion.Stretch, motion.BendX, motion.BendY, motion.Lift, motion.Moving,
-                    inputX = current.X, inputY = current.Y, surface.FallbackOpacity });
+                    inputX = current.X, inputY = current.Y, surface.FallbackOpacity, renderer.IsReady });
             }
             void Settle() { for (int f = 0; f < 720; f++) motion.Advance(1.0 / 120); }
 

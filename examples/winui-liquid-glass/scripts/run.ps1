@@ -1,4 +1,5 @@
 ﻿param(
+    [switch]$Switch,
     [switch]$Capture,
     [string]$OutputDirectory
 )
@@ -7,6 +8,11 @@ $ErrorActionPreference = 'Stop'
 $taskRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $taskPublish = Join-Path $taskRoot 'build\app'
 $taskProject = Join-Path $taskRoot 'src\Demo\LiquidGlassDemo.csproj'
+if ($Switch) {
+    if ($Capture) { throw 'Use scripts/capture-toggle-motion.py for the switch demo.' }
+    $taskPublish = Join-Path $taskRoot 'build\switch'
+    $taskProject = Join-Path $taskRoot 'src\SwitchDemo\LiquidGlassToggleDemo.csproj'
+}
 & dotnet publish $taskProject -c Release -p:Platform=x64 --self-contained true -o $taskPublish
 if ($LASTEXITCODE -ne 0) { throw 'Liquid glass demo build failed.' }
 
@@ -14,7 +20,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Liquid glass demo build failed.' }
 $taskLink = Join-Path $taskRoot 'build\LiquidGlassDemo.lnk'
 $taskShell = New-Object -ComObject WScript.Shell
 $taskShortcut = $taskShell.CreateShortcut($taskLink)
-$taskShortcut.TargetPath = Join-Path $taskPublish 'LiquidGlassDemo.exe'
+$taskShortcut.TargetPath = Join-Path $taskPublish $(if ($Switch) { 'LiquidGlassToggleDemo.exe' } else { 'LiquidGlassDemo.exe' })
 $taskShortcut.WorkingDirectory = $taskPublish
 $taskShortcut.WindowStyle = 1
 $taskShortcut.Arguments = ''
