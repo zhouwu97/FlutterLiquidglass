@@ -170,3 +170,7 @@ flutter build apk --release
 ## 迁移复盘与复用
 
 [完整替换 SYLUlive 的复盘](docs/liquid-glass-retrospective.md)说明最初效果僵硬的原因、业务接入边界及验证结果。[flutter-liquid-glass skill](skills/flutter-liquid-glass/SKILL.md)记录可复用的运动、采样和验收方法。
+
+## Flutter Web 光学对照实验
+
+[同步对照 demo](examples/flutter-web-comparison/README.md)在相同背景、输入与默认几何下并排运行固定原版和候选光学，包含网格／文字／彩色、清透／磨砂、深浅色、真实拖动及系统减少动态支持。原版完整入口继续保留。此实验不修改主 demo；[完整对比](examples/flutter-web-comparison/COMPARISON.md)与独立评审说明视觉取舍和 App 迁移边界。
